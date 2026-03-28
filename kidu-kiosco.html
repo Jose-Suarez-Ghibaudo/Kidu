@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0a">
+<title>Kidu Kiosco</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --blue:#3D2FCC;--blue-l:#EEF0FF;
+  --green:#00C48C;--green-l:#E6FAF4;
+  --coral:#FF6B6B;--coral-l:#FFF0F0;
+  --amber:#FFB830;--amber-l:#FFF8E7;
+  --dark:#0a0a0a;--dark2:#1a1730;
+  --font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;
+}
+html,body{height:100%;font-family:var(--font);background:#f0f2f8;-webkit-font-smoothing:antialiased;}
+
+/* ── LAYOUT ── */
+.app{min-height:100vh;display:flex;flex-direction:column;max-width:480px;margin:0 auto;background:white;}
+.header{background:var(--dark2);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.header-logo{font-size:20px;font-weight:700;color:white;letter-spacing:-0.5px;}
+.header-logo span{color:var(--green);}
+.header-tag{font-size:11px;color:rgba(255,255,255,.4);background:rgba(255,255,255,.08);padding:4px 12px;border-radius:20px;}
+.content{flex:1;overflow-y:auto;padding:20px;}
+
+/* ── PANTALLA INICIO ── */
+#screen-home{display:flex;flex-direction:column;gap:16px;}
+.scan-area{background:var(--dark2);border-radius:16px;padding:28px;text-align:center;cursor:pointer;transition:transform .15s;}
+.scan-area:active{transform:scale(.98);}
+.scan-icon{font-size:56px;margin-bottom:12px;}
+.scan-title{font-size:20px;font-weight:700;color:white;margin-bottom:6px;}
+.scan-sub{font-size:13px;color:rgba(255,255,255,.5);}
+.scan-btn{margin-top:16px;background:var(--green);color:white;border:none;border-radius:12px;padding:14px 28px;font-family:var(--font);font-size:15px;font-weight:700;cursor:pointer;}
+
+.manual-area{background:var(--blue-l);border-radius:14px;padding:16px;display:flex;align-items:center;gap:12px;cursor:pointer;}
+.manual-area:active{opacity:.8;}
+.manual-icon{font-size:28px;flex-shrink:0;}
+.manual-body{flex:1;}
+.manual-title{font-size:14px;font-weight:600;color:var(--blue);}
+.manual-sub{font-size:12px;color:rgba(61,47,204,.6);margin-top:2px;}
+
+/* resumen del día */
+.day-summary{background:white;border-radius:14px;border:1px solid #e5e7eb;padding:16px;}
+.ds-title{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;}
+.ds-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.ds-stat{text-align:center;padding:10px;background:#f9fafb;border-radius:10px;}
+.ds-val{font-size:22px;font-weight:700;color:var(--dark2);}
+.ds-lab{font-size:11px;color:#6b7280;margin-top:2px;}
+
+/* log reciente */
+.recent-title{font-size:13px;font-weight:600;color:#374151;margin-bottom:10px;}
+.tx-list{display:flex;flex-direction:column;gap:8px;}
+.tx-item{display:flex;align-items:center;gap:12px;padding:12px;background:#f9fafb;border-radius:12px;}
+.tx-av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:white;flex-shrink:0;}
+.tx-body{flex:1;}
+.tx-name{font-size:13px;font-weight:600;color:var(--dark2);}
+.tx-desc{font-size:11px;color:#6b7280;margin-top:1px;}
+.tx-monto{font-size:15px;font-weight:700;color:var(--coral);}
+.tx-time{font-size:10px;font-family:var(--mono);color:#9ca3af;}
+
+/* ── PANTALLA COBRO ── */
+#screen-cobro{display:none;flex-direction:column;gap:16px;}
+.alumno-card{border-radius:16px;padding:20px;display:flex;align-items:center;gap:16px;}
+.alumno-av{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:white;flex-shrink:0;}
+.alumno-name{font-size:20px;font-weight:700;color:var(--dark2);}
+.alumno-grade{font-size:12px;color:#6b7280;margin-top:2px;}
+.saldo-badge{margin-left:auto;text-align:right;}
+.saldo-val{font-size:22px;font-weight:700;color:var(--green);}
+.saldo-lab{font-size:10px;color:#6b7280;}
+
+/* teclado de monto */
+.monto-display{background:var(--dark2);border-radius:16px;padding:20px;text-align:center;}
+.monto-label{font-size:12px;color:rgba(255,255,255,.4);margin-bottom:8px;}
+.monto-val{font-size:48px;font-weight:700;color:white;letter-spacing:-2px;font-family:var(--mono);}
+.monto-currency{font-size:24px;color:rgba(255,255,255,.5);}
+
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.key{background:white;border:1.5px solid #e5e7eb;border-radius:14px;padding:18px;font-size:22px;font-weight:600;font-family:var(--font);cursor:pointer;transition:all .1s;text-align:center;color:var(--dark2);}
+.key:active{background:var(--blue-l);border-color:var(--blue);}
+.key.del{color:var(--coral);}
+.key.zero{grid-column:span 1;}
+
+/* productos rápidos */
+.quick-title{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+.quick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.quick-btn{background:var(--surface,#f5f6ff);border:1px solid #e5e7eb;border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;transition:all .1s;}
+.quick-btn:active{background:var(--blue-l);border-color:var(--blue);}
+.quick-emoji{font-size:20px;}
+.quick-name{font-size:10px;color:#374151;font-weight:500;margin-top:3px;}
+.quick-price{font-size:11px;color:var(--blue);font-weight:600;font-family:var(--mono);}
+
+.cobrar-btn{background:var(--green);color:white;border:none;border-radius:14px;padding:17px;font-family:var(--font);font-size:17px;font-weight:700;cursor:pointer;width:100%;}
+.cobrar-btn:disabled{background:#d1d5db;cursor:not-allowed;}
+.cancelar-btn{background:transparent;color:#6b7280;border:none;font-family:var(--font);font-size:14px;cursor:pointer;padding:8px;width:100%;text-align:center;}
+
+/* ── RESULTADO ── */
+#screen-resultado{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:16px;text-align:center;padding:32px;}
+.resultado-icon{font-size:80px;}
+.resultado-title{font-size:26px;font-weight:700;}
+.resultado-sub{font-size:15px;color:#6b7280;line-height:1.5;}
+.resultado-saldo{font-size:14px;font-family:var(--mono);color:var(--green);background:var(--green-l);padding:8px 20px;border-radius:20px;}
+.resultado-btn{background:var(--dark2);color:white;border:none;border-radius:14px;padding:16px 32px;font-family:var(--font);font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;}
+
+/* ── CÁMARA ── */
+#screen-camera{display:none;position:fixed;inset:0;background:var(--dark);z-index:100;flex-direction:column;}
+#scan-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+#scan-canvas{display:none;}
+.cam-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.cam-box{width:240px;height:240px;position:relative;}
+.cam-corner{position:absolute;width:36px;height:36px;border-color:var(--green);border-style:solid;}
+.cam-corner.tl{top:0;left:0;border-width:3px 0 0 3px;border-radius:6px 0 0 0;}
+.cam-corner.tr{top:0;right:0;border-width:3px 3px 0 0;border-radius:0 6px 0 0;}
+.cam-corner.bl{bottom:0;left:0;border-width:0 0 3px 3px;border-radius:0 0 0 6px;}
+.cam-corner.br{bottom:0;right:0;border-width:0 3px 3px 0;border-radius:0 0 6px 0;}
+.cam-line{position:absolute;left:6px;right:6px;height:2px;background:linear-gradient(to right,transparent,var(--green),transparent);animation:scan-cam 2s ease-in-out infinite;}
+@keyframes scan-cam{0%,100%{top:6px}50%{top:calc(100% - 8px)}}
+.cam-hint{color:rgba(255,255,255,.7);font-size:13px;margin-top:20px;}
+.cam-close{position:absolute;top:20px;right:20px;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:white;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+
+/* ── MODAL MANUAL ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-end;justify-content:center;z-index:200;}
+.modal-bg.show{display:flex;}
+.modal{background:white;border-radius:24px 24px 0 0;padding:28px 24px 36px;width:100%;}
+.modal-handle{width:40px;height:4px;background:#e5e7eb;border-radius:2px;margin:0 auto 20px;}
+.modal-title{font-size:18px;font-weight:700;margin-bottom:14px;color:var(--dark2);}
+.modal-input{width:100%;border:1.5px solid #e5e7eb;border-radius:12px;padding:14px 16px;font-family:var(--mono);font-size:20px;color:var(--dark2);outline:none;text-align:center;letter-spacing:3px;text-transform:uppercase;margin-bottom:12px;}
+.modal-input:focus{border-color:var(--blue);}
+.modal-btn{width:100%;background:var(--blue);color:white;border:none;border-radius:12px;padding:14px;font-family:var(--font);font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;}
+.modal-cancel{width:100%;background:transparent;color:#6b7280;border:none;font-family:var(--font);font-size:14px;cursor:pointer;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="header-logo">Ki<span>d</span>u <span style="font-weight:400;font-size:14px;color:rgba(255,255,255,.4);">Kiosco</span></div>
+    <div class="header-tag" id="header-date">—</div>
+  </div>
+
+  <div class="content">
+
+    <!-- PANTALLA HOME -->
+    <div id="screen-home">
+      <div class="scan-area" onclick="openCamera()">
+        <div class="scan-icon">📲</div>
+        <div class="scan-title">Escanear pulsera</div>
+        <div class="scan-sub">Apuntá la cámara al QR del alumno</div>
+        <button class="scan-btn">Abrir cámara</button>
+      </div>
+
+      <div class="manual-area" onclick="showManual()">
+        <div class="manual-icon">⌨️</div>
+        <div class="manual-body">
+          <div class="manual-title">Ingreso manual</div>
+          <div class="manual-sub">Escribí el ID de la pulsera</div>
+        </div>
+        <div style="color:#9ca3af;font-size:20px;">›</div>
+      </div>
+
+      <div class="day-summary">
+        <div class="ds-title">Resumen de hoy</div>
+        <div class="ds-grid">
+          <div class="ds-stat">
+            <div class="ds-val" id="stat-ventas">$0</div>
+            <div class="ds-lab">Total vendido</div>
+          </div>
+          <div class="ds-stat">
+            <div class="ds-val" id="stat-transacciones">0</div>
+            <div class="ds-lab">Transacciones</div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="recent-title">Últimas transacciones</div>
+        <div class="tx-list" id="tx-list">
+          <div style="text-align:center;color:#9ca3af;font-size:13px;padding:20px;">Sin transacciones hoy</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANTALLA COBRO -->
+    <div id="screen-cobro">
+      <div class="alumno-card" id="alumno-card" style="background:#f0f2f8;">
+        <div class="alumno-av" id="cobro-av">?</div>
+        <div>
+          <div class="alumno-name" id="cobro-nombre">—</div>
+          <div class="alumno-grade" id="cobro-grado">—</div>
+        </div>
+        <div class="saldo-badge">
+          <div class="saldo-val" id="cobro-saldo">$0</div>
+          <div class="saldo-lab">Saldo disponible</div>
+        </div>
+      </div>
+
+      <div class="monto-display">
+        <div class="monto-label">Monto a cobrar</div>
+        <div><span class="monto-currency">$</span><span class="monto-val" id="monto-display">0</span></div>
+      </div>
+
+      <div>
+        <div class="quick-title">Productos frecuentes</div>
+        <div class="quick-grid">
+          <div class="quick-btn" onclick="setMonto(150)"><div class="quick-emoji">🥤</div><div class="quick-name">Jugo</div><div class="quick-price">$150</div></div>
+          <div class="quick-btn" onclick="setMonto(200)"><div class="quick-emoji">🍞</div><div class="quick-name">Sándwich</div><div class="quick-price">$200</div></div>
+          <div class="quick-btn" onclick="setMonto(100)"><div class="quick-emoji">🍫</div><div class="quick-name">Golosina</div><div class="quick-price">$100</div></div>
+          <div class="quick-btn" onclick="setMonto(350)"><div class="quick-emoji">🍕</div><div class="quick-name">Pizza</div><div class="quick-price">$350</div></div>
+          <div class="quick-btn" onclick="setMonto(80)"><div class="quick-emoji">💧</div><div class="quick-name">Agua</div><div class="quick-price">$80</div></div>
+          <div class="quick-btn" onclick="setMonto(450)"><div class="quick-emoji">🥪</div><div class="quick-name">Combo</div><div class="quick-price">$450</div></div>
+        </div>
+      </div>
+
+      <div class="keypad">
+        <div class="key" onclick="keyPress('1')">1</div>
+        <div class="key" onclick="keyPress('2')">2</div>
+        <div class="key" onclick="keyPress('3')">3</div>
+        <div class="key" onclick="keyPress('4')">4</div>
+        <div class="key" onclick="keyPress('5')">5</div>
+        <div class="key" onclick="keyPress('6')">6</div>
+        <div class="key" onclick="keyPress('7')">7</div>
+        <div class="key" onclick="keyPress('8')">8</div>
+        <div class="key" onclick="keyPress('9')">9</div>
+        <div class="key" onclick="keyPress('00')">00</div>
+        <div class="key zero" onclick="keyPress('0')">0</div>
+        <div class="key del" onclick="keyDel()">⌫</div>
+      </div>
+
+      <button class="cobrar-btn" id="cobrar-btn" onclick="procesarCobro()">Cobrar</button>
+      <button class="cancelar-btn" onclick="cancelarCobro()">Cancelar</button>
+    </div>
+
+    <!-- PANTALLA RESULTADO -->
+    <div id="screen-resultado">
+      <div class="resultado-icon" id="res-icon">✅</div>
+      <div class="resultado-title" id="res-title">Cobro exitoso</div>
+      <div class="resultado-sub" id="res-sub">—</div>
+      <div class="resultado-saldo" id="res-saldo">Saldo: $0</div>
+      <button class="resultado-btn" onclick="volverHome()">Siguiente cliente</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- CÁMARA -->
+<div id="screen-camera" style="display:none;">
+  <video id="scan-video" playsinline autoplay muted></video>
+  <canvas id="scan-canvas"></canvas>
+  <div class="cam-overlay">
+    <div class="cam-box">
+      <div class="cam-line"></div>
+      <div class="cam-corner tl"></div>
+      <div class="cam-corner tr"></div>
+      <div class="cam-corner bl"></div>
+      <div class="cam-corner br"></div>
+    </div>
+    <div class="cam-hint">Apuntá al QR de la pulsera del alumno</div>
+  </div>
+  <button class="cam-close" onclick="closeCamera()">✕</button>
+</div>
+
+<!-- MODAL MANUAL -->
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">ID de pulsera</div>
+    <input class="modal-input" id="manual-input" placeholder="KDU-042" maxlength="10" autocomplete="off" spellcheck="false">
+    <button class="modal-btn" onclick="buscarAlumno(document.getElementById('manual-input').value)">Buscar alumno</button>
+    <button class="modal-cancel" onclick="hideManual()">Cancelar</button>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://nqopxhhywdlpfwqqxarw.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xb3B4aGh5d2RscGZ3cXF4YXJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MDA2MDAsImV4cCI6MjA5MDI3NjYwMH0.UGOZkeN4yQ14ij7Daq99lpWiIaC7vI5B268Qsov53G4';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const COLORS = ['#3D2FCC','#FF6B6B','#00C48C','#FFB830','#9B59B6','#E67E22'];
+let montoStr = '0';
+let alumnoActual = null;
+let scanInterval = null;
+let txHoy = [];
+
+// ── INIT ──
+document.getElementById('header-date').textContent =
+  new Date().toLocaleDateString('es-AR', { weekday:'short', day:'numeric', month:'short' });
+loadTxHoy();
+
+async function loadTxHoy() {
+  const { data } = await sb.from('transacciones')
+    .select('*, alumnos(nombre,apellido)')
+    .eq('tipo','compra')
+    .gte('created_at', new Date().toISOString().split('T')[0])
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  if (data) {
+    txHoy = data;
+    renderTxHoy();
+  }
+}
+
+function renderTxHoy() {
+  const total = txHoy.reduce((s, t) => s + parseFloat(t.monto), 0);
+  document.getElementById('stat-ventas').textContent = '$' + total.toLocaleString('es-AR');
+  document.getElementById('stat-transacciones').textContent = txHoy.length;
+
+  const list = document.getElementById('tx-list');
+  if (txHoy.length === 0) {
+    list.innerHTML = '<div style="text-align:center;color:#9ca3af;font-size:13px;padding:20px;">Sin transacciones hoy</div>';
+    return;
+  }
+  list.innerHTML = txHoy.map((t, i) => `
+    <div class="tx-item">
+      <div class="tx-av" style="background:${COLORS[i%COLORS.length]}">${(t.alumnos?.nombre||'?')[0]}</div>
+      <div class="tx-body">
+        <div class="tx-name">${t.alumnos?.nombre || '?'} ${t.alumnos?.apellido || ''}</div>
+        <div class="tx-desc">${t.descripcion || 'Compra en kiosco'}</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="tx-monto">-$${parseFloat(t.monto).toLocaleString('es-AR')}</div>
+        <div class="tx-time">${new Date(t.created_at).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── CÁMARA ──
+async function openCamera() {
+  document.getElementById('screen-camera').style.display = 'flex';
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { exact: 'environment' }, width: { ideal: 1280 } }
+    });
+    const video = document.getElementById('scan-video');
+    video.srcObject = stream;
+    await video.play();
+    scanInterval = setInterval(tryDecode, 100);
+  } catch(e) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      document.getElementById('scan-video').srcObject = stream;
+      await document.getElementById('scan-video').play();
+      scanInterval = setInterval(tryDecode, 100);
+    } catch(e2) {
+      closeCamera();
+      showManual();
+    }
+  }
+}
+
+function closeCamera() {
+  if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+  const video = document.getElementById('scan-video');
+  if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+  document.getElementById('screen-camera').style.display = 'none';
+}
+
+let lastScan = '';
+function tryDecode() {
+  const video = document.getElementById('scan-video');
+  const canvas = document.getElementById('scan-canvas');
+  if (!video.videoWidth) return;
+  const size = Math.min(video.videoWidth, video.videoHeight) * 0.6;
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(video, (video.videoWidth-size)/2, (video.videoHeight-size)/2, size, size, 0, 0, size, size);
+  try {
+    const lum = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+    const result = new ZXing.QRCodeReader().decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum)));
+    if (result?.text && result.text !== lastScan) {
+      lastScan = result.text;
+      closeCamera();
+      buscarAlumno(result.text);
+    }
+  } catch(e) {}
+}
+
+// ── BUSCAR ALUMNO ──
+async function buscarAlumno(raw) {
+  hideManual();
+  const id = raw.trim().toUpperCase();
+  const { data } = await sb.from('alumnos').select('*').eq('pulsera_id', id).single();
+  if (!data) {
+    showResultado(false, 'Pulsera no registrada', id, null);
+    return;
+  }
+  alumnoActual = data;
+  montoStr = '0';
+  lastScan = '';
+  showCobro(data);
+}
+
+function showCobro(a) {
+  const color = COLORS[Math.abs(a.nombre.charCodeAt(0)) % COLORS.length];
+  document.getElementById('cobro-av').textContent = a.nombre[0];
+  document.getElementById('cobro-av').style.background = color;
+  document.getElementById('cobro-nombre').textContent = a.nombre + ' ' + a.apellido;
+  document.getElementById('cobro-grado').textContent = a.grado + ' · ' + a.pulsera_id;
+  document.getElementById('cobro-saldo').textContent = '$' + parseFloat(a.saldo).toLocaleString('es-AR');
+  document.getElementById('alumno-card').style.background = color + '15';
+  updateMontoDisplay();
+  document.getElementById('screen-home').style.display = 'none';
+  document.getElementById('screen-cobro').style.display = 'flex';
+  document.getElementById('screen-cobro').style.flexDirection = 'column';
+  document.getElementById('screen-cobro').style.gap = '14px';
+}
+
+// ── TECLADO ──
+function keyPress(k) {
+  if (montoStr === '0') montoStr = k;
+  else if (montoStr.length < 6) montoStr += k;
+  updateMontoDisplay();
+}
+function keyDel() {
+  montoStr = montoStr.length > 1 ? montoStr.slice(0,-1) : '0';
+  updateMontoDisplay();
+}
+function setMonto(m) {
+  montoStr = String(m);
+  updateMontoDisplay();
+}
+function updateMontoDisplay() {
+  const val = parseInt(montoStr) || 0;
+  document.getElementById('monto-display').textContent = val.toLocaleString('es-AR');
+  const btn = document.getElementById('cobrar-btn');
+  const saldo = alumnoActual ? parseFloat(alumnoActual.saldo) : 0;
+  btn.disabled = val <= 0 || val > saldo;
+  btn.textContent = val > 0 ? `Cobrar $${val.toLocaleString('es-AR')}` : 'Cobrar';
+}
+
+// ── PROCESAR COBRO ──
+async function procesarCobro() {
+  const monto = parseInt(montoStr);
+  if (!monto || !alumnoActual) return;
+
+  document.getElementById('cobrar-btn').disabled = true;
+  document.getElementById('cobrar-btn').textContent = 'Procesando...';
+
+  const { data, error } = await sb.rpc('procesar_compra', {
+    p_pulsera_id: alumnoActual.pulsera_id,
+    p_monto: monto,
+    p_descripcion: 'Compra en kiosco'
+  });
+
+  if (error || !data?.ok) {
+    showResultado(false,
+      data?.msg || 'Error al procesar',
+      alumnoActual.nombre + ' ' + alumnoActual.apellido,
+      null
+    );
+  } else {
+    showResultado(true,
+      data.alumno,
+      `Cobrado $${monto.toLocaleString('es-AR')} exitosamente`,
+      data.saldo_despues
+    );
+    loadTxHoy();
+  }
+}
+
+function showResultado(ok, titulo, sub, saldo) {
+  document.getElementById('screen-cobro').style.display = 'none';
+  document.getElementById('screen-resultado').style.display = 'flex';
+  document.getElementById('res-icon').textContent = ok ? '✅' : '❌';
+  document.getElementById('res-title').textContent = ok ? titulo : 'Cobro rechazado';
+  document.getElementById('res-sub').textContent = ok ? sub : titulo + (sub ? ' — ' + sub : '');
+  document.getElementById('res-saldo').style.display = saldo !== null ? 'block' : 'none';
+  if (saldo !== null) document.getElementById('res-saldo').textContent = 'Saldo restante: $' + parseFloat(saldo).toLocaleString('es-AR');
+  document.getElementById('res-saldo').style.background = ok ? 'var(--green-l)' : 'var(--coral-l)';
+  document.getElementById('res-saldo').style.color = ok ? '#008060' : '#cc3333';
+}
+
+function cancelarCobro() {
+  alumnoActual = null;
+  document.getElementById('screen-cobro').style.display = 'none';
+  document.getElementById('screen-home').style.display = 'flex';
+  document.getElementById('screen-home').style.flexDirection = 'column';
+}
+
+function volverHome() {
+  alumnoActual = null;
+  montoStr = '0';
+  document.getElementById('screen-resultado').style.display = 'none';
+  document.getElementById('screen-home').style.display = 'flex';
+  document.getElementById('screen-home').style.flexDirection = 'column';
+  loadTxHoy();
+}
+
+// ── MODAL MANUAL ──
+function showManual() { document.getElementById('modal').classList.add('show'); setTimeout(()=>document.getElementById('manual-input').focus(),100); }
+function hideManual() { document.getElementById('modal').classList.remove('show'); document.getElementById('manual-input').value=''; }
+document.getElementById('manual-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') buscarAlumno(document.getElementById('manual-input').value);
+  if (e.key === 'Escape') hideManual();
+});
+</script>
+</body>
+</html>
