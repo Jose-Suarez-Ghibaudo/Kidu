@@ -444,7 +444,7 @@ async function renderDashboard() {
   const zones = {};
   students.filter(s => s.en_escuela && s.zona).forEach(s => {
     if (!zones[s.zona]) zones[s.zona] = [];
-    zones[s.zona].push(s.nombre);
+    zones[s.zona].push(s); // guardar objeto completo
   });
 
   document.getElementById('content').innerHTML = `
@@ -494,7 +494,7 @@ async function renderDashboard() {
                   </div>
                   <div class="zone-tile-count ${kids.length===0?'zero':''}">${kids.length}</div>
                   <div class="zone-kids">
-                    ${kids.map(k => `<span class="kid-tag">${k.nombre || k.n || '?'}</span>`).join('')}
+                    ${kids.map(k => `<span class="kid-tag">${typeof k === 'string' ? k : (k.nombre || '?')}</span>`).join('')}
                     ${kids.length === 0 ? '<span style="font-size:11px;color:var(--hint);">Sin alumnos</span>' : ''}
                   </div>
                 </div>
