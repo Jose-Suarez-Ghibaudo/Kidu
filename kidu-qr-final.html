@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kidu — QR Pulseras</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--blue:#3D2FCC;--green:#00C48C;--dark:#1a1730;--font:'DM Sans',sans-serif;--mono:'DM Mono',monospace}
+body{font-family:var(--font);background:#f0f2f8;padding:24px;-webkit-font-smoothing:antialiased}
+.header{text-align:center;margin-bottom:20px}
+.title{font-size:26px;font-weight:700;color:var(--blue);letter-spacing:-0.5px}
+.title span{color:var(--green)}
+.sub{font-size:13px;color:#6b7280;margin-top:4px}
+.controls{display:flex;gap:10px;justify-content:center;margin-bottom:20px;flex-wrap:wrap}
+.btn{padding:10px 22px;border-radius:10px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;border:none;background:var(--blue);color:white}
+.btn-ghost{background:white;color:var(--blue);border:1.5px solid var(--blue)}
+.steps{background:white;border-radius:10px;border:1px solid #e5e7eb;padding:12px 18px;margin-bottom:20px;display:flex;gap:16px;flex-wrap:wrap}
+.step{display:flex;align-items:center;gap:7px;font-size:12px;color:#6b7280}
+.snum{width:20px;height:20px;border-radius:50%;background:var(--blue);color:white;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
+.card{background:white;border-radius:12px;border:1.5px solid #e5e7eb;padding:14px;text-align:center}
+.av{width:40px;height:40px;border-radius:50%;color:white;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 8px}
+.cn{font-size:13px;font-weight:700;color:var(--dark);margin-bottom:1px}
+.ca{font-size:10px;color:#9ca3af}
+.cg{font-size:10px;color:#9ca3af;margin-bottom:10px}
+.qr-wrap{display:flex;justify-content:center;margin-bottom:8px}
+.qr-wrap canvas,.qr-wrap img{border-radius:6px!important}
+.cid{font-size:10px;font-family:var(--mono);color:#9ca3af;background:#f9fafb;padding:2px 7px;border-radius:5px;display:inline-block}
+.add{background:#f9fafb;border-radius:12px;border:1.5px dashed #d1d5db;padding:14px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;gap:6px}
+.add:hover{border-color:var(--blue);background:#EEF0FF}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+.modal-bg.show{display:flex}
+.modal{background:white;border-radius:14px;padding:24px;width:100%;max-width:320px}
+.mt{font-size:17px;font-weight:700;margin-bottom:14px;color:var(--dark)}
+.ig{margin-bottom:10px}
+.il{font-size:11px;font-weight:500;color:#6b7280;display:block;margin-bottom:3px}
+.if{width:100%;border:1.5px solid #e5e7eb;border-radius:8px;padding:9px 13px;font-family:var(--font);font-size:14px;color:var(--dark);outline:none}
+.if:focus{border-color:var(--blue)}
+.ma{display:flex;gap:8px;margin-top:4px}
+.mb{flex:1;padding:10px;border-radius:8px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;border:none}
+.mc{background:var(--blue);color:white}
+.mx{background:#f3f4f6;color:#6b7280}
+#loading{text-align:center;padding:40px;color:#6b7280;font-size:14px}
+@media print{
+  body{background:white;padding:8px}
+  .controls,.steps,.add,.modal-bg,#loading{display:none!important}
+  .header{margin-bottom:10px}
+  .grid{grid-template-columns:repeat(4,1fr);gap:8px}
+  .card{border:1px solid #ddd;border-radius:6px;padding:8px}
+}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="title">Ki<span>d</span>u — QR Pulseras</div>
+  <div class="sub">Imprimí, recortá y plastificá. El portero escanea con Kidu Scanner.</div>
+</div>
+<div class="controls">
+  <button class="btn" onclick="window.print()">🖨️ Imprimir</button>
+  <button class="btn btn-ghost" onclick="showModal()">+ Agregar alumno</button>
+</div>
+<div class="steps">
+  <div class="step"><div class="snum">1</div>Imprimí</div>
+  <div class="step"><div class="snum">2</div>Recortá cada tarjeta</div>
+  <div class="step"><div class="snum">3</div>Plastificá con cinta</div>
+  <div class="step"><div class="snum">4</div>Colgá en la mochila</div>
+</div>
+<div id="loading">Generando QR codes...</div>
+<div class="grid" id="grid" style="display:none;"></div>
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <div class="mt">Agregar alumno</div>
+    <div class="ig"><label class="il">Nombre</label><input class="if" id="in" placeholder="Sofía"></div>
+    <div class="ig"><label class="il">Apellido</label><input class="if" id="ia" placeholder="García"></div>
+    <div class="ig"><label class="il">Grado</label><input class="if" id="ig2" placeholder="4° A"></div>
+    <div class="ig"><label class="il">ID pulsera</label><input class="if" id="ii" placeholder="KDU-050" style="font-family:var(--mono);text-transform:uppercase"></div>
+    <div class="ma">
+      <button class="mb mx" onclick="hideModal()">Cancelar</button>
+      <button class="mb mc" onclick="addStudent()">Agregar</button>
+    </div>
+  </div>
+</div>
+<script>
+var COLORS=['#3D2FCC','#FF6B6B','#00C48C','#FFB830','#9B59B6','#E67E22','#2ECC71','#E74C3C'];
+var students=[
+  {n:'Sofía',a:'García',g:'4° A',id:'KDU-042'},
+  {n:'Lucas',a:'García',g:'2° B',id:'KDU-043'},
+  {n:'Valentina',a:'López',g:'4° A',id:'KDU-044'},
+  {n:'Martín',a:'Pérez',g:'3° C',id:'KDU-045'},
+  {n:'Camila',a:'Ruiz',g:'2° B',id:'KDU-046'},
+  {n:'Santiago',a:'Torres',g:'5° A',id:'KDU-047'},
+  {n:'Lucía',a:'Fernández',g:'3° C',id:'KDU-048'},
+  {n:'Tomás',a:'Rodríguez',g:'5° A',id:'KDU-049'},
+];
+
+function render(){
+  var grid=document.getElementById('grid');
+  grid.innerHTML='';
+  students.forEach(function(s,i){
+    var color=COLORS[i%COLORS.length];
+    var card=document.createElement('div');
+    card.className='card';
+    card.innerHTML=
+      '<div class="av" style="background:'+color+'">'+s.n[0]+'</div>'+
+      '<div class="cn">'+s.n+'</div>'+
+      '<div class="ca">'+s.a+'</div>'+
+      '<div class="cg">'+s.g+'</div>'+
+      '<div class="qr-wrap" id="qr-'+i+'"></div>'+
+      '<div class="cid">'+s.id+'</div>';
+    grid.appendChild(card);
+    // Generar QR con qrcodejs
+    new QRCode(document.getElementById('qr-'+i),{
+      text: s.id,
+      width: 130,
+      height: 130,
+      colorDark: '#1a1730',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  });
+  var add=document.createElement('div');
+  add.className='add';
+  add.onclick=showModal;
+  add.innerHTML='<div style="font-size:28px;color:#9ca3af">+</div><div style="font-size:12px;font-weight:500;color:#6b7280">Agregar alumno</div>';
+  grid.appendChild(add);
+  document.getElementById('loading').style.display='none';
+  grid.style.display='grid';
+}
+
+function showModal(){document.getElementById('modal').classList.add('show');document.getElementById('in').focus();}
+function hideModal(){
+  document.getElementById('modal').classList.remove('show');
+  ['in','ia','ig2','ii'].forEach(function(x){document.getElementById(x).value='';});
+}
+function addStudent(){
+  var n=document.getElementById('in').value.trim();
+  var a=document.getElementById('ia').value.trim();
+  var g=document.getElementById('ig2').value.trim();
+  var id=document.getElementById('ii').value.trim().toUpperCase();
+  if(!n||!id){alert('Completá nombre e ID');return;}
+  students.push({n:n,a:a,g:g,id:id});
+  hideModal();render();
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape')hideModal();
+  if(e.key==='Enter'&&document.getElementById('modal').classList.contains('show'))addStudent();
+});
+window.addEventListener('load',render);
+</script>
+</body>
+</html>
