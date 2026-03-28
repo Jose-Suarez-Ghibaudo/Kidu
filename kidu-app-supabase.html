@@ -275,8 +275,8 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   <div class="nav-bar">
     <div class="nav-item" onclick="go('home')"><div class="nav-icon">🗺️</div><span>Mapa</span><div class="nav-dot"></div></div>
     <div class="nav-item" onclick="go('historial')"><div class="nav-icon">📅</div><span>Historial</span><div class="nav-dot"></div></div>
-    <div class="nav-item active"><div class="nav-icon">🔔</div><span>Alertas</span><div class="nav-dot"></div></div>
-    <div class="nav-item" onclick="go('perfil')"><div class="nav-icon">👤</div><span>Perfil</span><div class="nav-dot"></div></div>
+    <div class="nav-item" onclick="go('wallet')"><div class="nav-icon">💳</div><span>Wallet</span><div class="nav-dot"></div></div>
+    <div class="nav-item active"><div class="nav-icon">👤</div><span>Perfil</span><div class="nav-dot"></div></div>
   </div>
 </div>
 
@@ -307,7 +307,43 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   </div>
 </div>
 
+<!-- ── WALLET ── -->
+<div class="screen" id="screen-wallet">
+  <div class="status-bar sb-dark" style="background:var(--blue);flex-shrink:0;"></div>
+  <div style="padding:14px 20px 10px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+    <div style="font-size:20px;font-weight:700;">Wallet</div>
+    <span style="font-size:12px;color:var(--muted);">Kiosco escolar</span>
+  </div>
+  <div class="scroll-body" id="wallet-body"></div>
+  <div class="nav-bar">
+    <div class="nav-item" onclick="go('home')"><div class="nav-icon">🗺️</div><span>Mapa</span><div class="nav-dot"></div></div>
+    <div class="nav-item" onclick="go('historial')"><div class="nav-icon">📅</div><span>Historial</span><div class="nav-dot"></div></div>
+    <div class="nav-item active"><div class="nav-icon">💳</div><span>Wallet</span><div class="nav-dot"></div></div>
+    <div class="nav-item" onclick="go('perfil')"><div class="nav-icon">👤</div><span>Perfil</span><div class="nav-dot"></div></div>
+  </div>
+</div>
+
 </div><!-- /app -->
+
+<!-- MODAL CARGA DE SALDO -->
+<div id="modal-carga" style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-end;justify-content:center;z-index:200;padding-bottom:env(safe-area-inset-bottom,0);">
+  <div style="background:white;border-radius:24px 24px 0 0;padding:28px 24px 36px;width:100%;max-width:480px;">
+    <div style="width:40px;height:4px;background:#e5e7eb;border-radius:2px;margin:0 auto 20px;"></div>
+    <div style="font-size:18px;font-weight:700;margin-bottom:6px;" id="modal-carga-title">Cargar saldo</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px;" id="modal-carga-sub">Seleccioná el monto a acreditar</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+      <button onclick="setMontoModal(500)" style="padding:14px;border-radius:12px;border:1.5px solid #e5e7eb;background:var(--surface);font-family:var(--font);font-size:15px;font-weight:600;cursor:pointer;">$500</button>
+      <button onclick="setMontoModal(1000)" style="padding:14px;border-radius:12px;border:1.5px solid #e5e7eb;background:var(--surface);font-family:var(--font);font-size:15px;font-weight:600;cursor:pointer;">$1.000</button>
+      <button onclick="setMontoModal(2000)" style="padding:14px;border-radius:12px;border:1.5px solid #e5e7eb;background:var(--surface);font-family:var(--font);font-size:15px;font-weight:600;cursor:pointer;">$2.000</button>
+      <button onclick="setMontoModal(3000)" style="padding:14px;border-radius:12px;border:1.5px solid #e5e7eb;background:var(--surface);font-family:var(--font);font-size:15px;font-weight:600;cursor:pointer;">$3.000</button>
+      <button onclick="setMontoModal(5000)" style="padding:14px;border-radius:12px;border:1.5px solid #e5e7eb;background:var(--surface);font-family:var(--font);font-size:15px;font-weight:600;cursor:pointer;">$5.000</button>
+      <button onclick="setMontoModal(10000)" style="padding:14px;border-radius:12px;border:1.5px solid #e5e7eb;background:var(--surface);font-family:var(--font);font-size:15px;font-weight:600;cursor:pointer;">$10.000</button>
+    </div>
+    <input type="number" id="modal-carga-input" placeholder="O ingresá otro monto..." style="width:100%;border:1.5px solid #e5e7eb;border-radius:12px;padding:13px 16px;font-family:var(--font);font-size:16px;outline:none;margin-bottom:14px;" oninput="document.getElementById('modal-carga-input').style.borderColor='var(--blue)'">
+    <button id="btn-confirmar-carga" onclick="confirmarCarga()" style="width:100%;background:var(--blue);color:white;border:none;border-radius:12px;padding:15px;font-family:var(--font);font-size:16px;font-weight:700;cursor:pointer;margin-bottom:10px;">Cargar saldo (simulado)</button>
+    <button onclick="closeModalCarga()" style="width:100%;background:transparent;color:var(--muted);border:none;font-family:var(--font);font-size:14px;cursor:pointer;">Cancelar</button>
+  </div>
+</div>
 
 <script>
 // ══════════════════════════════════════════════
@@ -336,6 +372,7 @@ function go(name) {
   document.getElementById('screen-' + name).classList.add('active');
   if (name === 'historial') loadHistorial();
   if (name === 'alertas') loadAlertas();
+  if (name === 'wallet') renderWallet();
 }
 
 // ══════════════════════════════════════════════
@@ -667,6 +704,155 @@ function showToast(msg) {
     go('home');
   }
 })();
+
+// ══════════════════════════════════════════════
+//  WALLET
+// ══════════════════════════════════════════════
+let alumnoWalletActual = null;
+let montoModalStr = '';
+
+async function renderWallet() {
+  const body = document.getElementById('wallet-body');
+  if (!alumnos || alumnos.length === 0) {
+    body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Sin alumnos registrados</div>';
+    return;
+  }
+
+  // Recargar alumnos con saldo actualizado
+  const { data: kids } = await sb.from('alumnos').select('*').eq('padre_id', currentUser.id);
+  if (kids) alumnos = kids;
+
+  const COLORS = ['#3D2FCC','#FF6B6B','#00C48C','#FFB830','#9B59B6','#E67E22'];
+
+  let html = '<div style="padding:0 0 20px;">';
+
+  alumnos.forEach((a, i) => {
+    const color = COLORS[i % COLORS.length];
+    const saldo = parseFloat(a.saldo || 0);
+    const limite = parseFloat(a.limite_diario || 500);
+    html += `
+      <div style="margin:0 16px 14px;background:white;border-radius:16px;border:1px solid #e5e7eb;overflow:hidden;">
+        <!-- Header del alumno -->
+        <div style="background:${color};padding:16px 18px;display:flex;align-items:center;gap:12px;">
+          <div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:white;flex-shrink:0;">${a.nombre[0]}</div>
+          <div style="flex:1;">
+            <div style="font-size:16px;font-weight:700;color:white;">${a.nombre} ${a.apellido}</div>
+            <div style="font-size:11px;color:rgba(255,255,255,.7);">${a.grado} · ${a.pulsera_id}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:24px;font-weight:700;color:white;font-family:var(--mono);">$${saldo.toLocaleString('es-AR')}</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.7);">saldo disponible</div>
+          </div>
+        </div>
+        <!-- Cuerpo -->
+        <div style="padding:14px 18px;">
+          <div style="display:flex;gap:8px;margin-bottom:12px;">
+            <div style="flex:1;background:#f9fafb;border-radius:10px;padding:10px;text-align:center;">
+              <div style="font-size:14px;font-weight:700;color:var(--dark);">$${limite.toLocaleString('es-AR')}</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px;">Límite diario</div>
+            </div>
+            <div style="flex:1;background:${a.pagos_activos ? 'var(--green-l)' : '#fef2f2'};border-radius:10px;padding:10px;text-align:center;">
+              <div style="font-size:14px;font-weight:700;color:${a.pagos_activos ? 'var(--green)' : 'var(--coral)'};">${a.pagos_activos ? '✅ Activo' : '🔴 Pausado'}</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px;">Pagos en kiosco</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="openModalCarga('${a.id}','${a.nombre}')" style="flex:2;background:var(--blue);color:white;border:none;border-radius:10px;padding:11px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;">💳 Cargar saldo</button>
+            <button onclick="togglePagos('${a.id}',${a.pagos_activos})" style="flex:1;background:${a.pagos_activos ? '#fef2f2' : 'var(--green-l)'};color:${a.pagos_activos ? 'var(--coral)' : 'var(--green)'};border:none;border-radius:10px;padding:11px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;">${a.pagos_activos ? '⏸ Pausar' : '▶ Activar'}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  // Historial de compras
+  html += '<div style="padding:0 16px;"><div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px;">Últimas compras en el kiosco</div>';
+
+  const { data: txs } = await sb.from('transacciones')
+    .select('*, alumnos(nombre,apellido)')
+    .in('alumno_id', alumnos.map(a => a.id))
+    .eq('tipo','compra')
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  if (txs && txs.length > 0) {
+    txs.forEach(t => {
+      const fecha = new Date(t.created_at);
+      html += `
+        <div style="display:flex;align-items:center;gap:12px;padding:12px;background:white;border-radius:12px;border:1px solid #f3f4f6;margin-bottom:8px;">
+          <div style="width:38px;height:38px;border-radius:50%;background:#fef2f2;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">🛒</div>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:600;">${t.alumnos?.nombre || '?'} ${t.alumnos?.apellido || ''}</div>
+            <div style="font-size:11px;color:var(--muted);">${t.descripcion || 'Compra en kiosco'} · ${fecha.toLocaleDateString('es-AR')} ${fecha.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:14px;font-weight:700;color:var(--coral);">-$${parseFloat(t.monto).toLocaleString('es-AR')}</div>
+            <div style="font-size:10px;color:var(--muted);font-family:var(--mono);">Saldo: $${parseFloat(t.saldo_despues||0).toLocaleString('es-AR')}</div>
+          </div>
+        </div>
+      `;
+    });
+  } else {
+    html += '<div style="text-align:center;color:var(--muted);font-size:13px;padding:20px;">Sin compras registradas</div>';
+  }
+
+  html += '</div></div>';
+  body.innerHTML = html;
+}
+
+// ── CARGA DE SALDO ──
+function openModalCarga(alumnoId, nombre) {
+  alumnoWalletActual = alumnoId;
+  document.getElementById('modal-carga-title').textContent = 'Cargar saldo a ' + nombre;
+  document.getElementById('modal-carga-input').value = '';
+  document.getElementById('modal-carga').style.display = 'flex';
+}
+
+function closeModalCarga() {
+  document.getElementById('modal-carga').style.display = 'none';
+  alumnoWalletActual = null;
+  montoModalStr = '';
+}
+
+function setMontoModal(m) {
+  document.getElementById('modal-carga-input').value = m;
+  document.getElementById('modal-carga-input').style.borderColor = 'var(--blue)';
+}
+
+async function confirmarCarga() {
+  const monto = parseFloat(document.getElementById('modal-carga-input').value);
+  if (!monto || monto <= 0) { showToast('Ingresá un monto válido'); return; }
+  if (!alumnoWalletActual) return;
+
+  const btn = document.getElementById('btn-confirmar-carga');
+  btn.textContent = 'Procesando...'; btn.disabled = true;
+
+  const { data, error } = await sb.rpc('cargar_saldo', {
+    p_alumno_id: alumnoWalletActual,
+    p_padre_id: currentUser.id,
+    p_monto: monto,
+    p_metodo: 'simulado'
+  });
+
+  btn.textContent = 'Cargar saldo (simulado)'; btn.disabled = false;
+
+  if (error || !data?.ok) {
+    showToast('Error: ' + (data?.msg || error?.message));
+  } else {
+    showToast('✅ $' + monto.toLocaleString('es-AR') + ' acreditados a ' + data.alumno);
+    closeModalCarga();
+    renderWallet();
+  }
+}
+
+// ── TOGGLE PAGOS ──
+async function togglePagos(alumnoId, estadoActual) {
+  const nuevoEstado = !estadoActual;
+  await sb.from('alumnos').update({ pagos_activos: nuevoEstado }).eq('id', alumnoId);
+  showToast(nuevoEstado ? '✅ Pagos activados' : '⏸ Pagos pausados');
+  renderWallet();
+}
+
 </script>
 </body>
 </html>
