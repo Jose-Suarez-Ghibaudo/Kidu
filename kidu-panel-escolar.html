@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1a1730">
+<title>Kidu — Panel Escolar</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --blue:      #3D2FCC; --blue-l: #EEF0FF; --blue-mid: #6558E8;
+  --green:     #00C48C; --green-l: #E6FAF4;
+  --coral:     #FF6B6B; --coral-l: #FFF0F0;
+  --amber:     #FFB830; --amber-l: #FFF8E7;
+  --dark:      #1a1730; --dark2: #221f3a;
+  --text:      #1a1730; --muted: #6b7280; --hint: #9ca3af;
+  --border:    #e5e7eb; --surface: #F5F6FF; --white: #fff;
+  --font: 'DM Sans', sans-serif; --mono: 'DM Mono', monospace;
+}
+body { font-family: var(--font); background: #f0f2f8; color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  position: fixed; top: 0; left: 0; bottom: 0;
+  width: 220px; background: var(--dark);
+  display: flex; flex-direction: column;
+  z-index: 100; border-right: 1px solid rgba(255,255,255,.06);
+}
+.sidebar-logo { padding: 20px 20px 16px; border-bottom: 1px solid rgba(255,255,255,.06); }
+.sidebar-wordmark { font-size: 22px; font-weight: 700; color: white; letter-spacing: -0.5px; }
+.sidebar-wordmark span { color: var(--green); }
+.sidebar-school { font-size: 11px; color: rgba(255,255,255,.35); margin-top: 3px; }
+.sidebar-nav { flex: 1; padding: 12px 0; overflow-y: auto; }
+.nav-section { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: rgba(255,255,255,.25); padding: 12px 20px 6px; }
+.nav-link { display: flex; align-items: center; gap: 10px; padding: 9px 20px; font-size: 13px; font-weight: 500; color: rgba(255,255,255,.55); cursor: pointer; transition: all .15s; border-radius: 0; text-decoration: none; }
+.nav-link:hover { color: white; background: rgba(255,255,255,.06); }
+.nav-link.active { color: white; background: rgba(61,47,204,.5); border-right: 2px solid var(--blue-mid); }
+.nav-icon { font-size: 17px; width: 20px; text-align: center; }
+.sidebar-bottom { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,.06); }
+.user-row { display: flex; align-items: center; gap: 10px; }
+.user-av { width: 32px; height: 32px; border-radius: 50%; background: var(--blue); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: white; flex-shrink: 0; }
+.user-name { font-size: 12px; font-weight: 500; color: rgba(255,255,255,.7); }
+.user-role { font-size: 10px; color: rgba(255,255,255,.35); }
+
+/* ── MAIN ── */
+.main { margin-left: 220px; min-height: 100vh; }
+.topbar { background: white; border-bottom: 1px solid var(--border); padding: 0 28px; height: 58px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+.topbar-title { font-size: 17px; font-weight: 700; }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.topbar-date { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+.status-indicator { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: #008060; background: var(--green-l); padding: 5px 12px; border-radius: 20px; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse-dot 2s ease infinite; }
+@keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.4} }
+.content { padding: 24px 28px; }
+
+/* ── STAT CARDS ── */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+.stat-card { background: white; border-radius: 14px; border: 1px solid var(--border); padding: 18px 20px; }
+.stat-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+.stat-val { font-size: 32px; font-weight: 700; line-height: 1; margin-bottom: 6px; }
+.stat-sub { font-size: 11px; color: var(--muted); }
+.stat-icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; float: right; margin-top: -4px; }
+
+/* ── GRID ── */
+.grid-2 { display: grid; grid-template-columns: 1fr 360px; gap: 20px; margin-bottom: 20px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+.card { background: white; border-radius: 14px; border: 1px solid var(--border); overflow: hidden; }
+.card-header { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.card-title { font-size: 14px; font-weight: 600; }
+.card-body { padding: 16px 20px; }
+
+/* ── MAPA DE ZONAS ── */
+.zone-map { padding: 16px 20px; }
+.zone-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.zone-tile { border-radius: 12px; border: 1px solid var(--border); padding: 14px; background: var(--surface); transition: all .2s; }
+.zone-tile.occupied { border-color: rgba(0,196,140,.4); background: var(--green-l); }
+.zone-tile-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.zone-tile-name { font-size: 13px; font-weight: 600; }
+.zone-tile-beacon { font-size: 10px; font-family: var(--mono); color: var(--muted); }
+.zone-tile-count { font-size: 28px; font-weight: 700; color: var(--green); }
+.zone-tile-count.zero { color: rgba(0,0,0,.15); }
+.zone-kids { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; min-height: 24px; }
+.kid-tag { font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 20px; background: rgba(0,196,140,.15); color: #008060; border: 1px solid rgba(0,196,140,.25); }
+
+/* ── TABLA ALUMNOS ── */
+.student-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.student-table th { padding: 10px 16px; text-align: left; font-weight: 600; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--border); background: var(--surface); }
+.student-table td { padding: 12px 16px; border-bottom: 1px solid #f9f9fb; vertical-align: middle; }
+.student-table tr:hover td { background: var(--surface); }
+.student-table tr:last-child td { border-bottom: none; }
+.student-name { font-weight: 600; font-size: 13px; }
+.student-grade { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.sb-present { background: var(--green-l); color: #008060; }
+.sb-absent  { background: #f3f4f6; color: var(--muted); }
+.zone-badge { font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 20px; background: var(--blue-l); color: var(--blue); }
+
+/* ── ASISTENCIA ── */
+.attendance-bar { display: flex; height: 8px; border-radius: 8px; overflow: hidden; margin: 8px 0; }
+.att-present { background: var(--green); }
+.att-absent  { background: #e5e7eb; }
+.att-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+
+/* ── LOG ── */
+.log-list { display: flex; flex-direction: column; max-height: 280px; overflow-y: auto; }
+.log-list::-webkit-scrollbar { width: 3px; }
+.log-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.log-item { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-bottom: 1px solid #f9f9fb; font-size: 12px; }
+.log-item:last-child { border-bottom: none; }
+.log-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+.ld-green { background: var(--green); }
+.ld-blue  { background: var(--blue); }
+.ld-coral { background: var(--coral); }
+.ld-gray  { background: var(--border); }
+.log-time { font-family: var(--mono); color: var(--hint); flex-shrink: 0; }
+.log-msg  { color: var(--text); flex: 1; line-height: 1.4; }
+
+/* ── QUICK ACTIONS ── */
+.action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.action-btn { padding: 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; text-align: center; transition: all .15s; font-family: var(--font); }
+.action-btn:hover { background: var(--blue-l); border-color: #c5bef8; }
+.action-icon { font-size: 22px; margin-bottom: 6px; }
+.action-label { font-size: 12px; font-weight: 600; color: var(--text); }
+.action-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+/* ── HORARIO ── */
+.schedule-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid #f9f9fb; font-size: 12px; }
+.schedule-row:last-child { border-bottom: none; }
+.schedule-time { font-family: var(--mono); color: var(--muted); min-width: 50px; }
+.schedule-event { flex: 1; font-weight: 500; }
+.schedule-badge { font-size: 10px; padding: 2px 8px; border-radius: 20px; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 1100px) {
+  .sidebar { width: 60px; }
+  .sidebar-wordmark, .sidebar-school, .nav-section, .nav-link span, .user-name, .user-role { display: none; }
+  .nav-link { justify-content: center; padding: 10px; }
+  .sidebar-bottom { padding: 12px; }
+  .user-row { justify-content: center; }
+  .main { margin-left: 60px; }
+}
+@media (max-width: 900px) {
+  .stats-row { grid-template-columns: repeat(2,1fr); }
+  .grid-2 { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: 1fr; }
+}
+
+/* ── LOGIN ── */
+#login-overlay {
+  position: fixed; inset: 0; background: var(--dark);
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
+}
+.login-box { background: white; border-radius: 20px; padding: 36px; width: 100%; max-width: 380px; }
+.login-logo { text-align: center; margin-bottom: 28px; }
+.login-wordmark { font-size: 32px; font-weight: 700; color: var(--blue); letter-spacing: -1px; }
+.login-wordmark span { color: var(--green); }
+.login-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.input-group { margin-bottom: 14px; }
+.input-label { font-size: 12px; font-weight: 500; color: var(--muted); margin-bottom: 5px; display: block; }
+.input-field { width: 100%; border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 16px; font-family: var(--font); font-size: 14px; color: var(--text); background: var(--surface); outline: none; transition: border-color .15s; }
+.input-field:focus { border-color: var(--blue); }
+.btn-login { width: 100%; background: var(--blue); color: white; border: none; border-radius: 10px; padding: 14px; font-family: var(--font); font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 6px; transition: opacity .15s; }
+.btn-login:hover { opacity: .9; }
+.login-error { color: #cc3333; font-size: 12px; text-align: center; margin-top: 10px; display: none; }
+.loading { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.3); border-top-color: white; border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ZONAS */
+.zona-grid-mgmt { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 14px; margin-bottom: 20px; }
+.zona-mgmt-card { background: white; border-radius: 12px; border: 1px solid var(--border); padding: 16px; position: relative; }
+.zona-mgmt-card:hover { border-color: var(--blue); }
+.zmg-name { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.zmg-beacon { font-size: 11px; font-family: var(--mono); color: var(--muted); margin-bottom: 10px; }
+.zmg-count { font-size: 12px; color: var(--muted); }
+.zmg-count span { font-weight: 700; color: var(--blue); }
+.zmg-actions { display: flex; gap: 8px; margin-top: 12px; }
+.zmg-btn { flex: 1; padding: 7px; border-radius: 8px; font-family: var(--font); font-size: 12px; font-weight: 600; cursor: pointer; border: none; transition: opacity .15s; }
+.zmg-edit { background: var(--blue-l); color: var(--blue); }
+.zmg-del  { background: #fef2f2; color: #dc2626; }
+.zmg-btn:hover { opacity: .8; }
+.zona-add-card { background: var(--surface); border-radius: 12px; border: 1.5px dashed var(--border); padding: 16px; text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 130px; gap: 6px; transition: all .15s; }
+.zona-add-card:hover { border-color: var(--blue); background: var(--blue-l); }
+.z-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 200; padding: 20px; }
+.z-modal-bg.show { display: flex; }
+.z-modal { background: white; border-radius: 16px; padding: 28px; width: 100%; max-width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,.15); }
+.z-modal-title { font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--dark); }
+.z-input-group { margin-bottom: 14px; }
+.z-input-label { font-size: 12px; font-weight: 500; color: var(--muted); display: block; margin-bottom: 4px; }
+.z-input { width: 100%; border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 14px; font-family: var(--font); font-size: 14px; color: var(--dark); outline: none; }
+.z-input:focus { border-color: var(--blue); }
+.z-input-hint { font-size: 11px; color: var(--hint); margin-top: 4px; }
+.z-actions { display: flex; gap: 10px; margin-top: 6px; }
+.z-btn { flex: 1; padding: 11px; border-radius: 8px; font-family: var(--font); font-size: 14px; font-weight: 600; cursor: pointer; border: none; }
+.z-confirm { background: var(--blue); color: white; }
+.z-cancel  { background: var(--surface); color: var(--muted); }
+
+/* TOAST */
+#toast { position: fixed; bottom: 24px; right: 24px; background: var(--dark); color: white; padding: 12px 20px; border-radius: 12px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 10px; transition: transform .3s cubic-bezier(.34,1.56,.64,1); z-index: 200; transform: translateY(80px); border: 1px solid rgba(255,255,255,.1); }
+#toast.show { transform: translateY(0); }
+.toast-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN OVERLAY -->
+<div id="login-overlay">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="login-wordmark">Ki<span>d</span>u</div>
+      <div class="login-sub">Panel escolar — Acceso directivos</div>
+    </div>
+    <div class="input-group">
+      <label class="input-label">Email institucional</label>
+      <input class="input-field" type="email" id="login-email" placeholder="director@escuela.edu.ar">
+    </div>
+    <div class="input-group">
+      <label class="input-label">Contraseña</label>
+      <input class="input-field" type="password" id="login-pass" placeholder="••••••••">
+    </div>
+    <button class="btn-login" id="login-btn" onclick="doLogin()">Ingresar al panel</button>
+    <div class="login-error" id="login-err">Email o contraseña incorrectos</div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"><div class="toast-dot"></div><span id="toast-msg">—</span></div>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-wordmark">Ki<span>d</span>u</div>
+    <div class="sidebar-school">Escuela N°42 — Córdoba</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Principal</div>
+    <div class="nav-link active" onclick="setView('dashboard')"><span class="nav-icon">📊</span><span>Dashboard</span></div>
+    <div class="nav-link" onclick="setView('alumnos')"><span class="nav-icon">👦</span><span>Alumnos</span></div>
+    <div class="nav-link" onclick="setView('asistencia')"><span class="nav-icon">✅</span><span>Asistencia</span></div>
+    <div class="nav-link" onclick="setView('mapa')"><span class="nav-icon">🗺️</span><span>Mapa en vivo</span></div>
+    <div class="nav-section">Administración</div>
+    <div class="nav-link" onclick="setView('alertas')"><span class="nav-icon">🔔</span><span>Alertas</span></div>
+    <div class="nav-link" onclick="setView('reportes')"><span class="nav-icon">📈</span><span>Reportes</span></div>
+    <div class="nav-link" onclick="setView('zonas')"><span class="nav-icon">📍</span><span>Zonas</span></div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="user-row">
+      <div class="user-av">D</div>
+      <div><div class="user-name">Dirección</div><div class="user-role">Administrador</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title" id="topbar-title">Dashboard</div>
+    <div class="topbar-right">
+      <div class="topbar-date" id="topbar-date">—</div>
+      <div class="status-indicator"><div class="status-dot"></div>Sistema activo</div>
+    </div>
+  </div>
+
+  <div class="content" id="content">
+    <!-- Contenido dinámico -->
+  </div>
+</div>
+
+<!-- MODAL ZONAS -->
+<div class="z-modal-bg" id="zona-modal">
+  <div class="z-modal">
+    <div class="z-modal-title" id="zona-modal-title">Nueva zona</div>
+    <div class="z-input-group">
+      <label class="z-input-label">Nombre de la zona</label>
+      <input class="z-input" id="zona-nombre" placeholder="Ej: Aula 3, Laboratorio, Gimnasio...">
+    </div>
+    <div class="z-input-group">
+      <label class="z-input-label">ID del beacon</label>
+      <input class="z-input" id="zona-beacon" placeholder="Ej: BCN-006">
+      <div class="z-input-hint">Identificador único del dispositivo beacon de esta zona</div>
+    </div>
+    <input type="hidden" id="zona-edit-id">
+    <div class="z-actions">
+      <button class="z-btn z-cancel" onclick="hideZonaModal()">Cancelar</button>
+      <button class="z-btn z-confirm" onclick="saveZona()">Guardar zona</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── SUPABASE ──
+const SUPABASE_URL = 'https://nqopxhhywdlpfwqqxarw.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xb3B4aGh5d2RscGZ3cXF4YXJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MDA2MDAsImV4cCI6MjA5MDI3NjYwMH0.UGOZkeN4yQ14ij7Daq99lpWiIaC7vI5B268Qsov53G4';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── ESTADO ──
+let currentView = 'dashboard';
+let allAlumnos = [];
+let logEntries = [];
+let realtimeCh = null;
+
+// Datos simulados para demo visual
+const DEMO_STUDENTS = [
+  { nombre:'Sofía', apellido:'García',    grado:'4° A', pulsera_id:'KDU-042', en_escuela:true,  zona:'Aula 2',    entrada:'08:05' },
+  { nombre:'Lucas', apellido:'García',    grado:'2° B', pulsera_id:'KDU-043', en_escuela:true,  zona:'Patio',     entrada:'08:15' },
+  { nombre:'Valentina', apellido:'López', grado:'4° A', pulsera_id:'KDU-044', en_escuela:true,  zona:'Aula 2',    entrada:'08:08' },
+  { nombre:'Martín', apellido:'Pérez',    grado:'3° C', pulsera_id:'KDU-045', en_escuela:true,  zona:'Aula 1',    entrada:'08:12' },
+  { nombre:'Camila', apellido:'Ruiz',     grado:'2° B', pulsera_id:'KDU-046', en_escuela:false, zona:null,        entrada:null },
+  { nombre:'Santiago', apellido:'Torres', grado:'5° A', pulsera_id:'KDU-047', en_escuela:true,  zona:'Biblioteca', entrada:'08:20' },
+  { nombre:'Lucía', apellido:'Fernández', grado:'3° C', pulsera_id:'KDU-048', en_escuela:false, zona:null,        entrada:null },
+  { nombre:'Tomás', apellido:'Rodríguez', grado:'5° A', pulsera_id:'KDU-049', en_escuela:true,  zona:'Aula 1',    entrada:'08:18' },
+];
+
+const DEMO_LOG = [
+  { time:'10:35', msg:'Lucas García → Patio (recreo)', type:'zona' },
+  { time:'10:20', msg:'Sofía García → Aula 2', type:'zona' },
+  { time:'10:00', msg:'Sofía García → Patio', type:'zona' },
+  { time:'08:20', msg:'Santiago Torres llegó a la escuela', type:'entrada' },
+  { time:'08:18', msg:'Tomás Rodríguez llegó a la escuela', type:'entrada' },
+  { time:'08:15', msg:'Lucas García llegó a la escuela', type:'entrada' },
+  { time:'08:12', msg:'Martín Pérez llegó a la escuela', type:'entrada' },
+  { time:'08:08', msg:'Valentina López llegó a la escuela', type:'entrada' },
+  { time:'08:05', msg:'Sofía García llegó a la escuela', type:'entrada' },
+];
+
+// ── LOGIN ──
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-pass').value;
+  const btn   = document.getElementById('login-btn');
+  const err   = document.getElementById('login-err');
+
+  btn.innerHTML = '<div class="loading"></div>';
+  btn.disabled = true;
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+  document.getElementById('login-overlay').style.display = 'none';
+  // Con o sin login, siempre cargamos datos reales de Supabase
+  await loadRealData();
+  initDashboard();
+  showToast(error ? 'Modo demo — datos en vivo' : 'Bienvenido al panel Kidu');
+  btn.textContent = 'Ingresar al panel';
+  btn.disabled = false;
+}
+
+// Login rápido demo (sin credenciales)
+document.getElementById('login-btn').addEventListener('dblclick', async () => {
+  document.getElementById('login-overlay').style.display = 'none';
+  await loadRealData();
+  initDashboard();
+  showToast('Cargando datos en vivo...');
+});
+
+// ── CARGAR DATOS REALES ──
+async function loadRealData() {
+  try {
+    const { data, error } = await sb.from('alumnos').select('*, zonas(nombre)');
+    if (data && data.length > 0) {
+      allAlumnos = data.map(a => ({
+        nombre: a.nombre, apellido: a.apellido, grado: a.grado,
+        pulsera_id: a.pulsera_id, en_escuela: a.en_escuela,
+        zona: a.zonas?.nombre || null,
+        entrada: a.ultima_vez ? formatTime(a.ultima_vez) : null
+      }));
+    }
+  } catch(e) {
+    console.log('Error cargando datos:', e);
+  }
+  subscribeRealtime();
+}
+
+function subscribeRealtime() {
+  if (realtimeCh) sb.removeChannel(realtimeCh);
+  realtimeCh = sb
+    .channel('panel-escolar-live')
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'alumnos'
+    }, async (payload) => {
+      // Actualizar solo el alumno que cambió
+      const { data } = await sb
+        .from('alumnos')
+        .select('*, zonas(nombre)')
+        .eq('id', payload.new.id)
+        .single();
+      if (data) {
+        const idx = allAlumnos.findIndex(a => a.pulsera_id === data.pulsera_id);
+        const updated = {
+          nombre: data.nombre, apellido: data.apellido, grado: data.grado,
+          pulsera_id: data.pulsera_id, en_escuela: data.en_escuela,
+          zona: data.zonas?.nombre || null,
+          entrada: data.ultima_vez ? formatTime(data.ultima_vez) : null
+        };
+        if (idx !== -1) allAlumnos[idx] = updated;
+        else allAlumnos.push(updated);
+      }
+      await renderCurrentView();
+      showToast('📍 ' + (payload.new.nombre || 'Alumno') + ' actualizó su ubicación');
+    })
+    .subscribe((status) => {
+      console.log('Realtime status:', status);
+    });
+}
+
+// ── VIEWS ──
+function setView(view) {
+  currentView = view;
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  event?.currentTarget?.classList.add('active');
+  const titles = { dashboard:'Dashboard', alumnos:'Alumnos', asistencia:'Asistencia', mapa:'Mapa en vivo', alertas:'Alertas', reportes:'Reportes', zonas:'Zonas' };
+  document.getElementById('topbar-title').textContent = titles[view] || view;
+  renderCurrentView();
+}
+
+function renderCurrentView() {
+  switch(currentView) {
+    case 'dashboard':   renderDashboard(); break; // async
+    case 'alumnos':     renderAlumnos(); break;
+    case 'asistencia':  renderAsistencia(); break;
+    case 'mapa':        renderMapa(); break;
+    case 'alertas':     renderAlertas(); break;
+    case 'reportes':    renderReportes(); break;
+    case 'zonas':       renderZonas(); break;
+  }
+}
+
+async function initDashboard() {
+  if (allAlumnos.length === 0) allAlumnos = DEMO_STUDENTS;
+  updateClock();
+  setInterval(updateClock, 1000);
+  await renderDashboard();
+}
+
+// ── DASHBOARD ──
+async function renderDashboard() {
+  if (todasLasZonas.length === 0) await loadZonas();
+  const students = allAlumnos.length > 0 ? allAlumnos : DEMO_STUDENTS;
+  const present = students.filter(s => s.en_escuela).length;
+  const absent  = students.length - present;
+  const pct     = Math.round(present / students.length * 100);
+
+  const zones = {};
+  students.filter(s => s.en_escuela && s.zona).forEach(s => {
+    if (!zones[s.zona]) zones[s.zona] = [];
+    zones[s.zona].push(s.nombre);
+  });
+
+  document.getElementById('content').innerHTML = `
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#E6FAF4;">👦</div>
+        <div class="stat-label">Alumnos en escuela</div>
+        <div class="stat-val" style="color:var(--green);">${present}</div>
+        <div class="stat-sub">de ${students.length} registrados</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#FFF0F0;">🏠</div>
+        <div class="stat-label">Ausentes hoy</div>
+        <div class="stat-val" style="color:var(--coral);">${absent}</div>
+        <div class="stat-sub">${pct}% de asistencia</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:var(--blue-l);">📡</div>
+        <div class="stat-label">Beacons activos</div>
+        <div class="stat-val" style="color:var(--blue);">4</div>
+        <div class="stat-sub">Entrada, Aula 1, Aula 2, Patio</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#FFF8E7;">🔔</div>
+        <div class="stat-label">Alertas hoy</div>
+        <div class="stat-val" style="color:var(--amber);">${DEMO_LOG.length}</div>
+        <div class="stat-sub">Última hace 5 min</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- MAPA ZONAS -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Zonas en tiempo real</div>
+          <span style="font-size:11px;color:var(--green);font-weight:500;">● En vivo</span>
+        </div>
+        <div class="zone-map">
+          <div class="zone-grid">
+            ${(todasLasZonas.length > 0 ? todasLasZonas : [{nombre:'Entrada',beacon_id:'BCN-001'},{nombre:'Aula 1',beacon_id:'BCN-002'},{nombre:'Aula 2',beacon_id:'BCN-003'},{nombre:'Patio',beacon_id:'BCN-004'}]).map(z => {
+              const kids = zones[z.nombre] || [];
+              return `
+                <div class="zone-tile ${kids.length > 0 ? 'occupied' : ''}">
+                  <div class="zone-tile-header">
+                    <div class="zone-tile-name">${z.nombre}</div>
+                    <div class="zone-tile-beacon">${z.beacon_id}</div>
+                  </div>
+                  <div class="zone-tile-count ${kids.length===0?'zero':''}">${kids.length}</div>
+                  <div class="zone-kids">
+                    ${kids.map(k => `<span class="kid-tag">${k.nombre}</span>`).join('')}
+                    ${kids.length === 0 ? '<span style="font-size:11px;color:var(--hint);">Sin alumnos</span>' : ''}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+            <div class="zone-tile" style="background:var(--blue-l);border-color:#d0caff;">
+              <div class="zone-tile-header"><div class="zone-tile-name" style="color:var(--blue);">Total escuela</div></div>
+              <div class="zone-tile-count">${present}</div>
+              <div style="font-size:11px;color:var(--blue);margin-top:4px;">${pct}% asistencia</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LOG + ACCIONES -->
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Últimos eventos</div></div>
+          <div class="card-body" style="padding:12px 16px;">
+            <div class="log-list">
+              ${DEMO_LOG.map(e => `
+                <div class="log-item">
+                  <div class="log-dot ld-${e.type==='entrada'?'green':e.type==='zona'?'blue':'coral'}"></div>
+                  <div class="log-time">${e.time}</div>
+                  <div class="log-msg">${e.msg}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Acciones rápidas</div></div>
+          <div class="card-body">
+            <div class="action-grid">
+              <button class="action-btn" onclick="setView('alumnos')"><div class="action-icon">👦</div><div class="action-label">Ver alumnos</div><div class="action-sub">Lista completa</div></button>
+              <button class="action-btn" onclick="setView('asistencia')"><div class="action-icon">✅</div><div class="action-label">Asistencia</div><div class="action-sub">Hoy</div></button>
+              <button class="action-btn" onclick="showToast('Reporte generado y enviado por email')"><div class="action-icon">📄</div><div class="action-label">Exportar</div><div class="action-sub">Reporte del día</div></button>
+              <button class="action-btn" onclick="showToast('Notificación enviada a todos los padres')"><div class="action-icon">📢</div><div class="action-label">Comunicado</div><div class="action-sub">Avisar a padres</div></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABLA ALUMNOS RESUMIDA -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Alumnos presentes ahora</div>
+        <span style="font-size:12px;color:var(--blue);cursor:pointer;" onclick="setView('alumnos')">Ver todos →</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="student-table">
+          <thead><tr>
+            <th>Alumno</th><th>Grado</th><th>Zona actual</th><th>Entrada</th><th>Estado</th>
+          </tr></thead>
+          <tbody>
+            ${students.filter(s => s.en_escuela).map(s => `
+              <tr>
+                <td><div class="student-name">${s.nombre} ${s.apellido}</div><div style="font-size:10px;color:var(--muted);font-family:var(--mono);">${s.pulsera_id}</div></td>
+                <td style="color:var(--muted);font-size:12px;">${s.grado}</td>
+                <td><span class="zone-badge">${s.zona || '—'}</span></td>
+                <td style="font-family:var(--mono);font-size:12px;color:var(--muted);">${s.entrada || '—'}</td>
+                <td><span class="status-badge sb-present">● Presente</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ── ALUMNOS ──
+function renderAlumnos() {
+  const students = allAlumnos.length > 0 ? allAlumnos : DEMO_STUDENTS;
+  document.getElementById('content').innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Todos los alumnos (${students.length})</div>
+        <div style="display:flex;gap:8px;">
+          <input type="text" placeholder="Buscar alumno..." oninput="filterStudents(this.value)" style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;font-family:var(--font);font-size:13px;outline:none;">
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="student-table" id="students-table">
+          <thead><tr>
+            <th>Alumno</th><th>Grado</th><th>Pulsera</th><th>Zona actual</th><th>Entrada</th><th>Estado</th>
+          </tr></thead>
+          <tbody id="students-body">
+            ${students.map(s => `
+              <tr>
+                <td><div class="student-name">${s.nombre} ${s.apellido}</div></td>
+                <td style="color:var(--muted);font-size:12px;">${s.grado}</td>
+                <td style="font-family:var(--mono);font-size:11px;color:var(--hint);">${s.pulsera_id}</td>
+                <td>${s.zona ? `<span class="zone-badge">${s.zona}</span>` : '<span style="color:var(--hint);font-size:12px;">—</span>'}</td>
+                <td style="font-family:var(--mono);font-size:12px;color:var(--muted);">${s.entrada || '—'}</td>
+                <td><span class="status-badge ${s.en_escuela ? 'sb-present' : 'sb-absent'}">${s.en_escuela ? '● Presente' : '○ Ausente'}</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function filterStudents(q) {
+  const students = (allAlumnos.length > 0 ? allAlumnos : DEMO_STUDENTS)
+    .filter(s => `${s.nombre} ${s.apellido} ${s.grado}`.toLowerCase().includes(q.toLowerCase()));
+  document.getElementById('students-body').innerHTML = students.map(s => `
+    <tr>
+      <td><div class="student-name">${s.nombre} ${s.apellido}</div></td>
+      <td style="color:var(--muted);font-size:12px;">${s.grado}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--hint);">${s.pulsera_id}</td>
+      <td>${s.zona ? `<span class="zone-badge">${s.zona}</span>` : '<span style="color:var(--hint);font-size:12px;">—</span>'}</td>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--muted);">${s.entrada || '—'}</td>
+      <td><span class="status-badge ${s.en_escuela ? 'sb-present' : 'sb-absent'}">${s.en_escuela ? '● Presente' : '○ Ausente'}</span></td>
+    </tr>
+  `).join('');
+}
+
+// ── ASISTENCIA ──
+function renderAsistencia() {
+  const students = allAlumnos.length > 0 ? allAlumnos : DEMO_STUDENTS;
+  const present  = students.filter(s => s.en_escuela).length;
+  const pct      = Math.round(present / students.length * 100);
+  const dias     = ['Lun 21','Mar 22','Mié 23','Jue 24','Vie 25','Lun 28'];
+  const datos    = [92, 88, 95, 100, pct, pct];
+
+  document.getElementById('content').innerHTML = `
+    <div class="stats-row" style="grid-template-columns:repeat(3,1fr);">
+      <div class="stat-card">
+        <div class="stat-label">Asistencia hoy</div>
+        <div class="stat-val" style="color:var(--green);">${pct}%</div>
+        <div class="stat-sub">${present} de ${students.length} alumnos</div>
+        <div class="attendance-bar" style="margin-top:12px;">
+          <div class="att-present" style="width:${pct}%;"></div>
+          <div class="att-absent" style="width:${100-pct}%;"></div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Promedio semanal</div>
+        <div class="stat-val" style="color:var(--blue);">94%</div>
+        <div class="stat-sub">Semana del 24 al 28 mar</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Promedio mensual</div>
+        <div class="stat-val" style="color:var(--blue);">91%</div>
+        <div class="stat-sub">Marzo 2026</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Asistencia por día — esta semana</div></div>
+        <div class="card-body">
+          ${dias.map((d, i) => `
+            <div style="margin-bottom:14px;">
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+                <span style="font-weight:500;">${d}</span>
+                <span style="color:var(--muted);">${datos[i]}%</span>
+              </div>
+              <div class="attendance-bar">
+                <div class="att-present" style="width:${datos[i]}%;"></div>
+                <div class="att-absent" style="width:${100-datos[i]}%;"></div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">Ausentes hoy</div></div>
+        <div class="card-body" style="padding:12px 16px;">
+          ${students.filter(s => !s.en_escuela).map(s => `
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #f9f9fb;">
+              <div style="width:36px;height:36px;border-radius:50%;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:var(--muted);">${s.nombre[0]}</div>
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:500;">${s.nombre} ${s.apellido}</div>
+                <div style="font-size:11px;color:var(--muted);">${s.grado}</div>
+              </div>
+              <span class="status-badge sb-absent">Sin registrar</span>
+            </div>
+          `).join('')}
+          ${students.filter(s => !s.en_escuela).length === 0 ? '<div style="text-align:center;color:var(--muted);font-size:13px;padding:20px 0;">¡Asistencia perfecta hoy! 🎉</div>' : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── MAPA ──
+async function renderMapa() {
+  if (todasLasZonas.length === 0) await loadZonas();
+  const students = allAlumnos.length > 0 ? allAlumnos : DEMO_STUDENTS;
+  const zoneMap = {};
+  students.filter(s => s.en_escuela && s.zona).forEach(s => {
+    if (!zoneMap[s.zona]) zoneMap[s.zona] = [];
+    zoneMap[s.zona].push(s);
+  });
+
+  const cols = Math.min(todasLasZonas.length, 3);
+  const svgW = 680;
+  const rows = Math.ceil(todasLasZonas.length / cols);
+  const svgH = rows * 155 + 90;
+  const zW = Math.floor((svgW - 60) / cols) - 10;
+  const zH = 130;
+
+  const zoneRects = todasLasZonas.map((z, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const x = 30 + col * (zW + 10);
+    const y = 65 + row * (zH + 16);
+    const alumnos = zoneMap[z.nombre] || [];
+    const isPatio = z.nombre.toLowerCase().includes('patio');
+    const fill   = isPatio ? '#b8e8cc' : '#c8daea';
+    const stroke = isPatio ? '#80b898' : '#90b5cc';
+    const txtClr = isPatio ? '#2a6a4a' : '#3a6a8a';
+    const pins = alumnos.slice(0,8).map((s, pi) =>
+      `<circle cx="${x+18+pi*24}" cy="${y+50}" r="11" fill="#3D2FCC" stroke="white" stroke-width="2"/>` +
+      `<text x="${x+18+pi*24}" y="${y+54}" font-size="9" fill="white" font-weight="700" text-anchor="middle" font-family="DM Sans">${s.nombre[0]}</text>`
+    ).join('');
+    return `
+      <rect x="${x}" y="${y}" width="${zW}" height="${zH}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="1"/>
+      <text x="${x+zW/2}" y="${y+20}" font-size="13" fill="${txtClr}" text-anchor="middle" font-family="DM Sans" font-weight="600">${z.nombre}</text>
+      <text x="${x+zW/2}" y="${y+34}" font-size="9" fill="${txtClr}" opacity="0.6" text-anchor="middle" font-family="DM Sans">${z.beacon_id}</text>
+      ${pins}
+      <text x="${x+zW/2}" y="${y+zH-10}" font-size="10" fill="${txtClr}" text-anchor="middle" font-family="DM Sans">${alumnos.length} alumnos</text>
+    `;
+  }).join('');
+
+  document.getElementById('content').innerHTML = `
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-header">
+        <div class="card-title">Mapa de zonas — tiempo real (${todasLasZonas.length} zonas)</div>
+        <span style="font-size:11px;color:var(--green);font-weight:500;">● En vivo</span>
+      </div>
+      <div style="padding:20px;overflow-x:auto;">
+        <svg width="100%" viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg">
+          <rect width="${svgW}" height="${svgH}" fill="#f0f4f8" rx="12"/>
+          <rect x="15" y="15" width="${svgW-30}" height="${svgH-30}" rx="14" fill="#dce8f5" stroke="#a8c8e0" stroke-width="1.5"/>
+          <text x="${svgW/2}" y="46" font-size="12" fill="#5a7fa0" text-anchor="middle" font-family="DM Sans" font-weight="600">Escuela N°42 — Córdoba</text>
+          ${zoneRects}
+        </svg>
+      </div>
+    </div>
+  `;
+}
+
+
+// ── ALERTAS ──
+function renderAlertas() {
+  document.getElementById('content').innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Registro de alertas — hoy</div>
+        <span style="font-size:12px;font-weight:500;color:var(--blue);">${DEMO_LOG.length} eventos</span>
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${DEMO_LOG.map(e => `
+          <div style="display:flex;gap:14px;align-items:center;padding:14px 20px;border-bottom:1px solid #f9f9fb;">
+            <div style="width:40px;height:40px;border-radius:12px;background:${e.type==='entrada'?'var(--green-l)':e.type==='zona'?'var(--blue-l)':'var(--coral-l)'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">${e.type==='entrada'?'✅':e.type==='zona'?'📍':'🏠'}</div>
+            <div style="flex:1;"><div style="font-size:13px;font-weight:600;">${e.msg}</div></div>
+            <div style="font-size:12px;color:var(--hint);font-family:var(--mono);">${e.time}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// ── REPORTES ──
+function renderReportes() {
+  document.getElementById('content').innerHTML = `
+    <div class="grid-3">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Reporte diario</div></div>
+        <div class="card-body">
+          <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Resumen de asistencia y movimientos del día de hoy.</p>
+          <button onclick="showToast('Reporte enviado por email')" style="width:100%;background:var(--blue);color:white;border:none;border-radius:10px;padding:12px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;">📄 Generar y enviar</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Reporte semanal</div></div>
+        <div class="card-body">
+          <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Estadísticas de asistencia de la semana completa.</p>
+          <button onclick="showToast('Reporte semanal generado')" style="width:100%;background:var(--blue);color:white;border:none;border-radius:10px;padding:12px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;">📊 Generar reporte</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Exportar datos</div></div>
+        <div class="card-body">
+          <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Descargar historial completo en formato Excel.</p>
+          <button onclick="showToast('Descargando CSV...')" style="width:100%;background:var(--green);color:white;border:none;border-radius:10px;padding:12px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;">⬇ Exportar CSV</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── UTILS ──
+function formatTime(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' });
+}
+
+function updateClock() {
+  const now = new Date();
+  document.getElementById('topbar-date').textContent =
+    now.toLocaleDateString('es-AR', { weekday:'long', day:'numeric', month:'long' }) + ' · ' +
+    now.toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+
+let toastTimer;
+function showToast(msg) {
+  document.getElementById('toast-msg').textContent = msg;
+  document.getElementById('toast').classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => document.getElementById('toast').classList.remove('show'), 2800);
+}
+
+// ── ZONAS — CRUD COMPLETO ──
+let todasLasZonas = [];
+
+async function loadZonas() {
+  const { data } = await sb.from('zonas').select('*').order('nombre');
+  todasLasZonas = data || [];
+  return todasLasZonas;
+}
+
+async function renderZonas() {
+  await loadZonas();
+  const students = allAlumnos.length > 0 ? allAlumnos : DEMO_STUDENTS;
+
+  document.getElementById('content').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div>
+        <div style="font-size:13px;color:var(--muted);">${todasLasZonas.length} zonas configuradas — el scanner usa estos IDs para ubicar a los alumnos</div>
+      </div>
+      <button onclick="showZonaModal()" style="background:var(--blue);color:white;border:none;border-radius:10px;padding:10px 20px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;">+ Nueva zona</button>
+    </div>
+    <div class="zona-grid-mgmt" id="zonas-container"></div>
+    <div style="background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:16px 20px;margin-top:8px;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px;">¿Cómo funciona?</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.7;">
+        Cada zona tiene un <strong>nombre</strong> (lo que ven padres y dirección) y un <strong>ID de beacon</strong> (el código del dispositivo físico instalado en ese lugar).<br>
+        Cuando agregás una zona acá, automáticamente aparece en el scanner del portero para que pueda seleccionarla.
+      </div>
+    </div>
+  `;
+  renderZonasCards();
+}
+
+function renderZonasCards() {
+  const students = allAlumnos.length > 0 ? allAlumnos : DEMO_STUDENTS;
+  const container = document.getElementById('zonas-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  todasLasZonas.forEach(z => {
+    const count = students.filter(s => s.zona === z.nombre && s.en_escuela).length;
+    const card = document.createElement('div');
+    card.className = 'zona-mgmt-card';
+    // Usar data attributes para evitar problemas con comillas en nombres
+    card.dataset.id     = z.id;
+    card.dataset.nombre = z.nombre;
+    card.dataset.beacon = z.beacon_id;
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <div style="width:36px;height:36px;border-radius:10px;background:var(--blue-l);display:flex;align-items:center;justify-content:center;font-size:18px;">📍</div>
+        <div>
+          <div class="zmg-name">${z.nombre}</div>
+          <div class="zmg-beacon">${z.beacon_id}</div>
+        </div>
+      </div>
+      <div class="zmg-count">Alumnos ahora: <span>${count}</span></div>
+      <div class="zmg-actions">
+        <button class="zmg-btn zmg-edit" data-action="edit">✏️ Editar</button>
+        <button class="zmg-btn zmg-del"  data-action="delete">🗑️ Eliminar</button>
+      </div>
+    `;
+    // Event listeners usando los data attributes del card padre
+    card.querySelector('[data-action="edit"]').addEventListener('click', () => {
+      editZona(card.dataset.id, card.dataset.nombre, card.dataset.beacon);
+    });
+    card.querySelector('[data-action="delete"]').addEventListener('click', () => {
+      deleteZona(card.dataset.id, card.dataset.nombre);
+    });
+    container.appendChild(card);
+  });
+
+  // Botón agregar
+  const addCard = document.createElement('div');
+  addCard.className = 'zona-add-card';
+  addCard.onclick = () => showZonaModal();
+  addCard.innerHTML = `<div style="font-size:28px;color:#9ca3af;">+</div><div style="font-size:13px;font-weight:500;color:var(--muted);">Agregar zona</div>`;
+  container.appendChild(addCard);
+}
+
+function showZonaModal() {
+  // Nueva zona — sin ID
+  document.getElementById('zona-modal-title').textContent = 'Nueva zona';
+  document.getElementById('zona-nombre').value  = '';
+  document.getElementById('zona-edit-id').value = '';
+  const nextNum = String(todasLasZonas.length + 1).padStart(3, '0');
+  document.getElementById('zona-beacon').value  = 'BCN-0' + nextNum;
+  document.getElementById('zona-modal').classList.add('show');
+  setTimeout(() => document.getElementById('zona-nombre').focus(), 100);
+}
+
+function editZona(id, nombre, beacon) {
+  // Editar zona existente — con ID
+  document.getElementById('zona-modal-title').textContent = 'Editar zona';
+  document.getElementById('zona-nombre').value  = nombre || '';
+  document.getElementById('zona-beacon').value  = beacon || '';
+  document.getElementById('zona-edit-id').value = id || '';
+  document.getElementById('zona-modal').classList.add('show');
+  setTimeout(() => document.getElementById('zona-nombre').focus(), 100);
+}
+
+function hideZonaModal() {
+  document.getElementById('zona-modal').classList.remove('show');
+  document.getElementById('zona-nombre').value = '';
+  document.getElementById('zona-beacon').value = '';
+  document.getElementById('zona-edit-id').value = '';
+}
+
+let savingZona = false;
+async function saveZona() {
+  if (savingZona) return; // evitar doble submit
+  savingZona = true;
+
+  const nombre   = document.getElementById('zona-nombre').value.trim();
+  const beacon   = document.getElementById('zona-beacon').value.trim().toUpperCase();
+  const editId   = document.getElementById('zona-edit-id').value.trim();
+
+  if (!nombre || !beacon) { savingZona = false; alert('Completá nombre y ID de beacon'); return; }
+
+  try {
+    if (editId) {
+      const { error } = await sb.from('zonas').update({ nombre, beacon_id: beacon }).eq('id', editId);
+      if (error) throw error;
+      showToast(`Zona "${nombre}" actualizada`);
+    } else {
+      const { data: escuela } = await sb.from('escuelas').select('id').single();
+      const { error } = await sb.from('zonas').insert({ nombre, beacon_id: beacon, escuela_id: escuela?.id });
+      if (error) throw error;
+      showToast(`Zona "${nombre}" creada`);
+    }
+    hideZonaModal();
+    await renderZonas();
+  } catch(e) {
+    alert('Error al guardar: ' + e.message);
+  } finally {
+    savingZona = false;
+  }
+}
+
+function editZona(id, nombre, beacon) {
+  showZonaModal(id, nombre, beacon);
+}
+
+async function deleteZona(id, nombre) {
+  if (!confirm(`¿Eliminar la zona "${nombre}"?\nSe borrarán también los registros de ubicación asociados.`)) return;
+  try {
+    // 1. Limpiar zona_actual en alumnos
+    await sb.from('alumnos').update({ zona_actual: null, en_escuela: false }).eq('zona_actual', id);
+    // 2. Eliminar historial de ubicaciones de esta zona
+    await sb.from('ubicaciones').delete().eq('zona_id', id);
+    // 3. Eliminar alertas asociadas a esta zona
+    await sb.from('alertas').delete().eq('zona_id', id);
+    // 4. Ahora sí eliminar la zona
+    const { error } = await sb.from('zonas').delete().eq('id', id);
+    if (error) throw error;
+    showToast(`Zona "${nombre}" eliminada`);
+    await loadRealData();
+    await renderZonas();
+  } catch(e) {
+    alert('Error al eliminar: ' + e.message);
+  }
+}
+
+// Tecla Escape cierra el modal
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') hideZonaModal();
+  if (e.key === 'Enter' && document.getElementById('zona-modal').classList.contains('show')) {
+    e.preventDefault(); // evitar submit doble
+    saveZona();
+  }
+});
+
+// Doble click en logo para demo rápido
+document.querySelector('.sidebar-logo').addEventListener('dblclick', async () => {
+  document.getElementById('login-overlay').style.display = 'none';
+  await loadRealData();
+  initDashboard();
+});
+
+// Init — cargar datos reales siempre
+(async () => {
+  // Intentar sesión existente
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    document.getElementById('login-overlay').style.display = 'none';
+    await loadRealData();
+    initDashboard();
+  }
+  // Si no hay sesión pero se saltó el login (modo demo), igual cargar datos
+})();
+</script>
+</body>
+</html>

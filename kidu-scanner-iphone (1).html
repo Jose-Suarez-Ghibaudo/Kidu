@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kidu Scanner">
+<meta name="theme-color" content="#0a0a0a">
+<title>Kidu Scanner</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+:root {
+  --green: #00C48C; --green-l: #E6FAF4;
+  --coral: #FF6B6B; --blue: #3D2FCC;
+  --dark: #0a0a0a; --font: 'DM Sans', sans-serif; --mono: 'DM Mono', monospace;
+}
+html, body { height: 100%; overflow: hidden; background: var(--dark); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+
+/* ── FULLSCREEN CAMERA ── */
+#video {
+  position: fixed; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+#canvas { display: none; }
+
+/* ── OVERLAY PRINCIPAL ── */
+.overlay {
+  position: fixed; inset: 0; z-index: 10;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: space-between;
+  padding: env(safe-area-inset-top, 20px) 0 env(safe-area-inset-bottom, 20px);
+}
+
+/* ── TOP BAR ── */
+.top-bar {
+  width: 100%; padding: 14px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(to bottom, rgba(0,0,0,.7), transparent);
+}
+.logo { display: flex; align-items: center; gap: 8px; }
+.logo-text { font-size: 18px; font-weight: 700; color: white; letter-spacing: -0.5px; }
+.logo-text span { color: var(--green); }
+.scan-counter { font-size: 13px; font-family: var(--mono); color: rgba(255,255,255,.6); background: rgba(255,255,255,.1); padding: 4px 12px; border-radius: 20px; }
+
+/* ── ZONA SELECTOR ── */
+.zone-bar {
+  width: 100%; padding: 0 16px;
+  display: flex; gap: 8px; overflow-x: auto; justify-content: center;
+}
+.zone-bar::-webkit-scrollbar { display: none; }
+.zone-btn {
+  white-space: nowrap; padding: 8px 18px; border-radius: 20px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  background: rgba(255,255,255,.1); color: rgba(255,255,255,.65);
+  border: 1.5px solid rgba(255,255,255,.15);
+  font-family: var(--font); transition: all .2s; flex-shrink: 0;
+}
+.zone-btn.active {
+  background: var(--green); color: white;
+  border-color: var(--green);
+  box-shadow: 0 0 20px rgba(0,196,140,.4);
+}
+
+/* ── VISOR QR ── */
+.viewfinder-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+}
+.viewfinder {
+  width: 240px; height: 240px; position: relative;
+}
+/* 4 esquinas animadas */
+.vf-corner {
+  position: absolute; width: 36px; height: 36px;
+  border-color: var(--green); border-style: solid;
+}
+.vf-corner.tl { top:0; left:0;  border-width: 3px 0 0 3px; border-radius: 6px 0 0 0; }
+.vf-corner.tr { top:0; right:0; border-width: 3px 3px 0 0; border-radius: 0 6px 0 0; }
+.vf-corner.bl { bottom:0; left:0;  border-width: 0 0 3px 3px; border-radius: 0 0 0 6px; }
+.vf-corner.br { bottom:0; right:0; border-width: 0 3px 3px 0; border-radius: 0 0 6px 0; }
+/* línea de escaneo */
+.scan-line {
+  position: absolute; left: 6px; right: 6px; height: 2px;
+  background: linear-gradient(to right, transparent, var(--green), transparent);
+  animation: scan 2s ease-in-out infinite;
+  top: 6px;
+}
+@keyframes scan { 0%,100%{top:6px;opacity:1} 50%{top:calc(100% - 8px);opacity:.8} }
+.vf-hint { font-size: 13px; color: rgba(255,255,255,.6); text-align: center; }
+
+/* ── RESULTADO FLASH ── */
+.result-flash {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity .15s;
+  padding: 32px;
+}
+.result-flash.show { opacity: 1; pointer-events: all; }
+.result-flash.ok   { background: rgba(0,196,140,.92); }
+.result-flash.err  { background: rgba(255,107,107,.92); }
+.result-emoji { font-size: 72px; margin-bottom: 16px; }
+.result-name  { font-size: 32px; font-weight: 700; color: white; letter-spacing: -1px; text-align: center; margin-bottom: 6px; }
+.result-zone  { font-size: 18px; color: rgba(255,255,255,.85); text-align: center; margin-bottom: 8px; }
+.result-id    { font-size: 13px; font-family: var(--mono); color: rgba(255,255,255,.55); }
+
+/* ── BOTTOM LOG ── */
+.bottom-bar {
+  width: 100%; padding: 0 16px 8px;
+  background: linear-gradient(to top, rgba(0,0,0,.75), transparent);
+}
+.log-scroll {
+  display: flex; flex-direction: column; gap: 5px;
+  max-height: 100px; overflow: hidden;
+}
+.log-entry {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: rgba(255,255,255,.65);
+  animation: slideUp .3s ease;
+}
+@keyframes slideUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.le-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.le-ok  { background: var(--green); }
+.le-err { background: var(--coral); }
+.le-time { font-family: var(--mono); color: rgba(255,255,255,.35); font-size: 11px; }
+
+/* ── MODO MANUAL BTN ── */
+.manual-fab {
+  position: fixed; bottom: calc(env(safe-area-inset-bottom, 16px) + 130px); right: 20px;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: rgba(255,255,255,.15); border: 1.5px solid rgba(255,255,255,.25);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; cursor: pointer; z-index: 20;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+
+/* ── MODAL MANUAL ── */
+.modal-bg {
+  position: fixed; inset: 0; background: rgba(0,0,0,.7);
+  display: none; align-items: flex-end; justify-content: center;
+  z-index: 100; padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.modal-bg.show { display: flex; }
+.modal {
+  background: #1a1a2e; border-radius: 24px 24px 0 0;
+  padding: 28px 24px 32px; width: 100%;
+  border-top: 1px solid rgba(255,255,255,.1);
+}
+.modal-handle { width: 40px; height: 4px; background: rgba(255,255,255,.2); border-radius: 2px; margin: 0 auto 20px; }
+.modal-title { font-size: 18px; font-weight: 700; color: white; margin-bottom: 16px; }
+.modal-input {
+  width: 100%; background: rgba(255,255,255,.08);
+  border: 1.5px solid rgba(255,255,255,.15);
+  border-radius: 12px; padding: 14px 16px;
+  font-family: var(--mono); font-size: 18px;
+  color: white; outline: none; text-align: center;
+  letter-spacing: 2px; text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.modal-input:focus { border-color: var(--green); }
+.modal-hint { font-size: 12px; color: rgba(255,255,255,.4); text-align: center; margin-bottom: 16px; }
+.modal-btn {
+  width: 100%; background: var(--green); color: white;
+  border: none; border-radius: 12px; padding: 15px;
+  font-family: var(--font); font-size: 16px; font-weight: 700;
+  cursor: pointer; margin-bottom: 10px;
+}
+.modal-cancel { width: 100%; background: transparent; color: rgba(255,255,255,.4); border: none; font-family: var(--font); font-size: 14px; cursor: pointer; padding: 6px; }
+
+/* ── INICIO CÁMARA ── */
+.camera-start {
+  position: fixed; inset: 0; background: var(--dark);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 16px; z-index: 200; padding: 32px; text-align: center;
+}
+.camera-start-icon { font-size: 64px; margin-bottom: 8px; }
+.camera-start-title { font-size: 22px; font-weight: 700; color: white; }
+.camera-start-sub { font-size: 14px; color: rgba(255,255,255,.5); line-height: 1.6; }
+.camera-start-btn {
+  background: var(--green); color: white; border: none;
+  border-radius: 14px; padding: 16px 36px;
+  font-family: var(--font); font-size: 16px; font-weight: 700;
+  cursor: pointer; margin-top: 8px;
+}
+</style>
+</head>
+<body>
+
+<!-- PANTALLA INICIO (pedir permiso cámara en iPhone) -->
+<div class="camera-start" id="camera-start">
+  <div class="camera-start-icon">📷</div>
+  <div class="camera-start-title">Kidu Scanner</div>
+  <div class="camera-start-sub">Necesita acceso a la cámara para escanear los QR de las pulseras.<br><br>Al tocar el botón, Safari te pedirá permiso.</div>
+  <button class="camera-start-btn" onclick="initCamera()">Activar cámara</button>
+</div>
+
+<!-- VIDEO FULLSCREEN -->
+<video id="video" playsinline autoplay muted></video>
+<canvas id="canvas"></canvas>
+
+<!-- OVERLAY -->
+<div class="overlay" id="overlay" style="display:none;">
+
+  <!-- TOP -->
+  <div class="top-bar">
+    <div class="logo">
+      <svg width="22" height="22" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="16" stroke="white" stroke-width="3" fill="none"/><circle cx="24" cy="24" r="7" fill="white"/><circle cx="24" cy="8" r="4" fill="#00C48C"/></svg>
+      <div class="logo-text">Ki<span>d</span>u</div>
+    </div>
+    <div class="scan-counter" id="scan-counter">0 escaneos</div>
+  </div>
+
+  <!-- ZONA -->
+  <div class="zone-bar" id="zone-bar"></div>
+
+  <!-- VISOR -->
+  <div class="viewfinder-wrap">
+    <div class="viewfinder">
+      <div class="scan-line"></div>
+      <div class="vf-corner tl"></div>
+      <div class="vf-corner tr"></div>
+      <div class="vf-corner bl"></div>
+      <div class="vf-corner br"></div>
+    </div>
+    <div class="vf-hint">Acercá la tarjeta QR del alumno</div>
+  </div>
+
+  <!-- LOG -->
+  <div class="bottom-bar">
+    <div class="log-scroll" id="log-scroll"></div>
+  </div>
+
+</div>
+
+<!-- RESULTADO FLASH -->
+<div class="result-flash" id="result-flash">
+  <div class="result-emoji" id="result-emoji">✅</div>
+  <div class="result-name"  id="result-name">—</div>
+  <div class="result-zone"  id="result-zone">—</div>
+  <div class="result-id"    id="result-id">—</div>
+</div>
+
+<!-- FAB MANUAL -->
+<button class="manual-fab" id="manual-fab" style="display:none;" onclick="showManual()">✏️</button>
+
+<!-- MODAL MANUAL -->
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Ingreso manual</div>
+    <input class="modal-input" id="manual-input" placeholder="KDU-042" maxlength="10" autocomplete="off" autocorrect="off" spellcheck="false">
+    <div class="modal-hint">Escribí el ID de la pulsera del alumno</div>
+    <button class="modal-btn" onclick="processManual()">Registrar</button>
+    <button class="modal-cancel" onclick="hideManual()">Cancelar</button>
+  </div>
+</div>
+
+<script>
+// ── SUPABASE ──
+const SUPABASE_URL = 'https://nqopxhhywdlpfwqqxarw.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xb3B4aGh5d2RscGZ3cXF4YXJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MDA2MDAsImV4cCI6MjA5MDI3NjYwMH0.UGOZkeN4yQ14ij7Daq99lpWiIaC7vI5B268Qsov53G4';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── ZONAS — se cargan desde Supabase ──
+let ZONES = [];
+let currentZone = null;
+
+async function fetchZonas() {
+  try {
+    const { data } = await sb.from('zonas').select('*').order('nombre');
+    if (data && data.length > 0) {
+      ZONES = data.map(z => ({ name: z.nombre, beacon: z.beacon_id }));
+    }
+  } catch(e) {
+    // Fallback si no hay conexión
+    ZONES = [
+      { name:'Entrada', beacon:'BCN-001' },
+      { name:'Aula 1',  beacon:'BCN-002' },
+      { name:'Aula 2',  beacon:'BCN-003' },
+      { name:'Patio',   beacon:'BCN-004' },
+    ];
+  }
+  currentZone = ZONES[0] || { name:'Entrada', beacon:'BCN-001' };
+}
+let scanning = false;
+let scanCount = 0;
+let lastCode = '';
+let lastTime = 0;
+let logEntries = [];
+
+// ── AUDIO FEEDBACK ──
+// Genera beeps usando Web Audio API (funciona en iPhone)
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+
+function beep(freq, dur, type='sine') {
+  try {
+    if (!audioCtx) audioCtx = new AudioCtx();
+    const osc  = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.value = freq;
+    osc.type = type;
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + dur);
+  } catch(e) {}
+}
+
+function beepOk()  { beep(880, 0.12); setTimeout(() => beep(1320, 0.15), 100); }
+function beepErr() { beep(220, 0.3, 'sawtooth'); }
+
+// ── VIBRACIÓN ──
+function vibrate(ok) {
+  if ('vibrate' in navigator) {
+    navigator.vibrate(ok ? [50, 30, 50] : [200]);
+  }
+}
+
+// ── INIT CÁMARA ──
+async function initCamera() {
+  try {
+    // iPhone necesita constraints específicos para cámara trasera
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { exact: 'environment' },
+        width:  { ideal: 1920 },
+        height: { ideal: 1080 },
+        frameRate: { ideal: 30 }
+      }
+    });
+    const video = document.getElementById('video');
+    video.srcObject = stream;
+    await video.play();
+
+    // Iniciar audio (requiere gesto del usuario — el tap en el botón lo activa)
+    if (!audioCtx) audioCtx = new AudioCtx();
+
+    document.getElementById('camera-start').style.display = 'none';
+    document.getElementById('overlay').style.display = 'flex';
+    document.getElementById('manual-fab').style.display = 'flex';
+
+    initZones();
+    scanning = true;
+    startScanLoop();
+
+  } catch(e) {
+    // Fallback: cámara frontal o cualquier cámara
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      document.getElementById('video').srcObject = stream;
+      await document.getElementById('video').play();
+      document.getElementById('camera-start').style.display = 'none';
+      document.getElementById('overlay').style.display = 'flex';
+      document.getElementById('manual-fab').style.display = 'flex';
+      initZones();
+      scanning = true;
+      startScanLoop();
+    } catch(e2) {
+      // Sin cámara — modo manual solo
+      document.getElementById('camera-start').innerHTML = `
+        <div class="camera-start-icon">✏️</div>
+        <div class="camera-start-title">Modo manual</div>
+        <div class="camera-start-sub">La cámara no está disponible.<br>Podés registrar alumnos ingresando el ID manualmente.</div>
+        <button class="camera-start-btn" onclick="activateManualMode()">Continuar sin cámara</button>
+      `;
+    }
+  }
+}
+
+async function activateManualMode() {
+  document.getElementById('camera-start').style.display = 'none';
+  document.getElementById('overlay').style.display = 'flex';
+  document.getElementById('manual-fab').style.display = 'flex';
+  await initZones();
+}
+
+// ── INIT ZONAS ──
+async function initZones() {
+  await fetchZonas();
+  const bar = document.getElementById('zone-bar');
+  bar.innerHTML = ZONES.map((z, i) => `
+    <button class="zone-btn ${i===0?'active':''}" onclick="selectZone(${i})">${z.name}</button>
+  `).join('');
+}
+
+function selectZone(idx) {
+  currentZone = ZONES[idx];
+  document.querySelectorAll('.zone-btn').forEach((b, i) => b.classList.toggle('active', i===idx));
+  addLog(`Zona: ${currentZone.name}`, false);
+}
+
+// ── LOOP DE ESCANEO ──
+// Usamos setInterval en lugar de rAF — más estable en iPhone Safari
+// cuando la pantalla muestra overlays o animaciones
+let frameCount = 0;
+let scanInterval = null;
+
+function scanLoop() {
+  // no-op — mantenemos la función por compatibilidad
+}
+
+function startScanLoop() {
+  if (scanInterval) return;
+  scanInterval = setInterval(() => {
+    if (!scanning) return;
+    tryDecodeFrame();
+  }, 80); // cada 80ms = ~12 fps — más rápido en iPhone
+}
+
+function stopScanLoop() {
+  if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+}
+
+// ZXing reader — más rápido que jsQR en iPhone
+let zxingReader = null;
+function getReader() {
+  if (!zxingReader) {
+    zxingReader = new ZXing.BrowserQRCodeReader();
+  }
+  return zxingReader;
+}
+
+function tryDecodeFrame() {
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  if (!video.videoWidth || !video.readyState >= 2) return;
+
+  // Recortar centro — más rápido de analizar
+  const size = Math.min(video.videoWidth, video.videoHeight) * 0.5;
+  canvas.width  = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const sx = (video.videoWidth  - size) / 2;
+  const sy = (video.videoHeight - size) / 2;
+  ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
+
+  try {
+    const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+    const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
+    const result = new ZXing.QRCodeReader().decode(binaryBitmap);
+    if (result?.text) {
+      const now = Date.now();
+      if (result.text === lastCode && now - lastTime < 1500) return;
+      lastCode = result.text;
+      lastTime = now;
+      handleScan(result.text);
+    }
+  } catch(e) {
+    // No QR detectado en este frame — normal
+  }
+}
+
+// ── PROCESAR ESCANEO ──
+async function handleScan(raw) {
+  scanning = false;
+  let pulsera_id = raw.trim().toUpperCase();
+  try { const j = JSON.parse(raw); pulsera_id = j.id || j.pulsera_id || pulsera_id; } catch {}
+  try {
+    await register(pulsera_id);
+  } catch(e) {
+    // Si hay error inesperado, reanudar igual
+    scanning = true;
+    frameCount = 0;
+    startScanLoop();
+  }
+}
+
+async function processManual() {
+  const val = document.getElementById('manual-input').value.trim().toUpperCase();
+  if (!val) return;
+  hideManual();
+  await register(val);
+}
+
+async function register(pulsera_id) {
+  const flash   = document.getElementById('result-flash');
+  const emojiEl = document.getElementById('result-emoji');
+  const nameEl  = document.getElementById('result-name');
+  const zoneEl  = document.getElementById('result-zone');
+  const idEl    = document.getElementById('result-id');
+
+  const { data, error } = await sb.rpc('mover_alumno', {
+    p_pulsera_id: pulsera_id,
+    p_beacon_id:  currentZone.beacon,
+    p_rssi:       -55
+  });
+
+  // ok=false con "Sin cambio" = ya estaba en esa zona = verde igual
+  const moved    = !error && data?.ok === true;
+  const sameZone = !error && data?.ok === false && data?.msg?.includes('Sin cambio');
+  const notFound = !moved && !sameZone;
+
+  if (moved) {
+    emojiEl.textContent = '✅';
+    nameEl.textContent  = data.alumno;
+    zoneEl.textContent  = `→ ${data.zona}`;
+    idEl.textContent    = pulsera_id;
+    flash.className = 'result-flash ok show';
+    beepOk(); vibrate(true); scanCount++;
+    document.getElementById('scan-counter').textContent = `${scanCount} escaneo${scanCount!==1?'s':''}`;
+    addLog(`${data.alumno} → ${data.zona}`, true);
+  } else if (sameZone) {
+    emojiEl.textContent = '✅';
+    nameEl.textContent  = data.alumno || pulsera_id;
+    zoneEl.textContent  = `✓ Ya en ${currentZone.name}`;
+    idEl.textContent    = pulsera_id;
+    flash.className = 'result-flash ok show';
+    beepOk(); vibrate(true); scanCount++;
+    document.getElementById('scan-counter').textContent = `${scanCount} escaneo${scanCount!==1?'s':''}`;
+    addLog(`${data.alumno || pulsera_id} ✓ ${currentZone.name}`, true);
+  } else {
+    emojiEl.textContent = '❌';
+    nameEl.textContent  = 'Pulsera no registrada';
+    zoneEl.textContent  = pulsera_id;
+    idEl.textContent    = error?.message || data?.error || 'Verificá el ID';
+    flash.className = 'result-flash err show';
+    beepErr(); vibrate(false);
+    addLog(`Sin registro: ${pulsera_id}`, false);
+  }
+
+  // Auto-dismiss y reanudar escaneo continuo
+  setTimeout(() => {
+    flash.className = 'result-flash';
+    lastCode = '';
+    lastTime = 0;
+    scanning = true;
+    startScanLoop();
+  }, 900); // flash más corto = más ágil
+}
+
+// ── LOG ──
+function addLog(msg, ok) {
+  const time = new Date().toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  logEntries.unshift({ msg, ok, time });
+  if (logEntries.length > 4) logEntries.pop();
+  document.getElementById('log-scroll').innerHTML = logEntries.map(e => `
+    <div class="log-entry">
+      <div class="le-dot ${e.ok ? 'le-ok' : 'le-err'}"></div>
+      <div class="le-time">${e.time}</div>
+      <div>${e.msg}</div>
+    </div>
+  `).join('');
+}
+
+// ── MODAL ──
+function showManual() {
+  document.getElementById('modal').classList.add('show');
+  setTimeout(() => document.getElementById('manual-input').focus(), 100);
+}
+function hideManual() {
+  document.getElementById('modal').classList.remove('show');
+  document.getElementById('manual-input').value = '';
+}
+document.getElementById('manual-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') processManual();
+});
+</script>
+</body>
+</html>

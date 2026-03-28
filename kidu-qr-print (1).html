@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kidu — QR Pulseras</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --blue:#3D2FCC; --green:#00C48C; --dark:#1a1730; --font:'DM Sans',sans-serif; --mono:'DM Mono',monospace; }
+body { font-family:var(--font); background:#f0f2f8; padding:24px; -webkit-font-smoothing:antialiased; }
+.page-header { text-align:center; margin-bottom:24px; }
+.page-title { font-size:28px; font-weight:700; color:var(--blue); letter-spacing:-0.5px; }
+.page-title span { color:var(--green); }
+.page-sub { font-size:13px; color:#6b7280; margin-top:6px; line-height:1.5; }
+.controls { display:flex; gap:12px; justify-content:center; margin-bottom:24px; }
+.btn { padding:10px 24px; border-radius:10px; font-family:var(--font); font-size:14px; font-weight:600; cursor:pointer; border:none; background:var(--blue); color:white; }
+.instrucciones { background:white; border-radius:12px; border:1px solid #e5e7eb; padding:14px 20px; margin-bottom:24px; display:flex; gap:20px; flex-wrap:wrap; }
+.inst-item { display:flex; align-items:center; gap:8px; font-size:13px; color:#6b7280; }
+.inst-num { width:22px; height:22px; border-radius:50%; background:var(--blue); color:white; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.wrist-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px,1fr)); gap:14px; }
+.wrist-card { background:white; border-radius:14px; border:1.5px solid #e5e7eb; padding:16px; text-align:center; break-inside:avoid; }
+.wrist-avatar { width:40px; height:40px; border-radius:50%; color:white; font-size:18px; font-weight:700; display:flex; align-items:center; justify-content:center; margin:0 auto 8px; }
+.wrist-name  { font-size:14px; font-weight:700; color:var(--dark); margin-bottom:2px; }
+.wrist-full  { font-size:11px; color:#9ca3af; }
+.wrist-grade { font-size:11px; color:#9ca3af; margin-bottom:12px; }
+.wrist-qr    { display:flex; justify-content:center; margin-bottom:10px; }
+.wrist-qr canvas { border-radius:6px; border:1px solid #f3f4f6; }
+.wrist-id { font-size:11px; font-family:var(--mono); color:#9ca3af; background:#f9fafb; padding:3px 8px; border-radius:6px; display:inline-block; }
+.add-card { background:#f9fafb; border-radius:14px; border:1.5px dashed #d1d5db; padding:16px; text-align:center; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:240px; gap:8px; transition:border-color .15s, background .15s; }
+.add-card:hover { border-color:var(--blue); background:#EEF0FF; }
+.add-icon { font-size:28px; color:#9ca3af; }
+.add-label { font-size:13px; font-weight:500; color:#6b7280; }
+.modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; z-index:100; }
+.modal-bg.show { display:flex; }
+.modal { background:white; border-radius:16px; padding:28px; width:100%; max-width:340px; }
+.modal-title { font-size:18px; font-weight:700; margin-bottom:18px; color:var(--dark); }
+.input-group { margin-bottom:12px; }
+.input-label { font-size:12px; font-weight:500; color:#6b7280; display:block; margin-bottom:4px; }
+.input-field { width:100%; border:1.5px solid #e5e7eb; border-radius:8px; padding:10px 14px; font-family:var(--font); font-size:14px; color:var(--dark); outline:none; }
+.input-field:focus { border-color:var(--blue); }
+.modal-actions { display:flex; gap:10px; margin-top:6px; }
+.modal-btn { flex:1; padding:11px; border-radius:8px; font-family:var(--font); font-size:14px; font-weight:600; cursor:pointer; border:none; }
+.modal-confirm { background:var(--blue); color:white; }
+.modal-cancel  { background:#f3f4f6; color:#6b7280; }
+@media print {
+  body { background:white; padding:12px; }
+  .controls, .instrucciones, .add-card, .modal-bg { display:none !important; }
+  .wrist-grid { grid-template-columns:repeat(4,1fr); gap:10px; }
+}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="page-title">Ki<span>d</span>u — QR Pulseras</div>
+  <div class="page-sub">Imprimí, recortá y plastificá cada tarjeta.<br>El portero la escanea con Kidu Scanner cuando el alumno llega o cambia de zona.</div>
+</div>
+
+<div class="controls">
+  <button class="btn" onclick="window.print()">🖨️ Imprimir todas las pulseras</button>
+</div>
+
+<div class="instrucciones">
+  <div class="inst-item"><div class="inst-num">1</div>Imprimí esta página</div>
+  <div class="inst-item"><div class="inst-num">2</div>Recortá cada tarjeta</div>
+  <div class="inst-item"><div class="inst-num">3</div>Plastificá o cubrí con cinta transparente</div>
+  <div class="inst-item"><div class="inst-num">4</div>Colgá en la mochila o muñeca del alumno</div>
+</div>
+
+<div class="wrist-grid" id="wrist-grid">
+  <div class="add-card" onclick="showModal()">
+    <div class="add-icon">+</div>
+    <div class="add-label">Agregar alumno</div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <div class="modal-title">Agregar alumno</div>
+    <div class="input-group"><label class="input-label">Nombre</label><input class="input-field" id="in-nombre" placeholder="Sofía"></div>
+    <div class="input-group"><label class="input-label">Apellido</label><input class="input-field" id="in-apellido" placeholder="García"></div>
+    <div class="input-group"><label class="input-label">Grado</label><input class="input-field" id="in-grado" placeholder="4° A"></div>
+    <div class="input-group"><label class="input-label">ID de pulsera</label><input class="input-field" id="in-id" placeholder="KDU-050" style="font-family:var(--mono);"></div>
+    <div class="modal-actions">
+      <button class="modal-btn modal-cancel" onclick="hideModal()">Cancelar</button>
+      <button class="modal-btn modal-confirm" onclick="addStudent()">Agregar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS = ['#3D2FCC','#FF6B6B','#00C48C','#FFB830','#9B59B6','#E67E22','#2ECC71','#E74C3C'];
+let students = [
+  { nombre:'Sofía',    apellido:'García',    grado:'4° A', id:'KDU-042' },
+  { nombre:'Lucas',    apellido:'García',    grado:'2° B', id:'KDU-043' },
+  { nombre:'Valentina',apellido:'López',     grado:'4° A', id:'KDU-044' },
+  { nombre:'Martín',   apellido:'Pérez',     grado:'3° C', id:'KDU-045' },
+  { nombre:'Camila',   apellido:'Ruiz',      grado:'2° B', id:'KDU-046' },
+  { nombre:'Santiago', apellido:'Torres',    grado:'5° A', id:'KDU-047' },
+  { nombre:'Lucía',    apellido:'Fernández', grado:'3° C', id:'KDU-048' },
+  { nombre:'Tomás',    apellido:'Rodríguez', grado:'5° A', id:'KDU-049' },
+];
+
+async function renderAll() {
+  const grid = document.getElementById('wrist-grid');
+  const addCard = grid.querySelector('.add-card');
+  grid.innerHTML = '';
+  for (let i = 0; i < students.length; i++) {
+    const s = students[i];
+    const color = COLORS[i % COLORS.length];
+    const card = document.createElement('div');
+    card.className = 'wrist-card';
+    const qrCanvas = document.createElement('canvas');
+    await QRCode.toCanvas(qrCanvas, s.id, { width:130, margin:1, color:{ dark:'#1a1730', light:'#ffffff' } });
+    card.innerHTML = `
+      <div class="wrist-avatar" style="background:${color};">${s.nombre[0]}</div>
+      <div class="wrist-name">${s.nombre}</div>
+      <div class="wrist-full">${s.apellido}</div>
+      <div class="wrist-grade">${s.grado}</div>
+      <div class="wrist-qr"></div>
+      <div class="wrist-id">${s.id}</div>
+    `;
+    card.querySelector('.wrist-qr').appendChild(qrCanvas);
+    grid.appendChild(card);
+  }
+  grid.appendChild(addCard);
+}
+
+function showModal() { document.getElementById('modal').classList.add('show'); document.getElementById('in-nombre').focus(); }
+function hideModal() {
+  document.getElementById('modal').classList.remove('show');
+  ['in-nombre','in-apellido','in-grado','in-id'].forEach(id => document.getElementById(id).value = '');
+}
+async function addStudent() {
+  const nombre   = document.getElementById('in-nombre').value.trim();
+  const apellido = document.getElementById('in-apellido').value.trim();
+  const grado    = document.getElementById('in-grado').value.trim();
+  const id       = document.getElementById('in-id').value.trim().toUpperCase();
+  if (!nombre || !id) { alert('Completá nombre e ID'); return; }
+  students.push({ nombre, apellido, grado, id });
+  hideModal();
+  await renderAll();
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('modal').classList.contains('show')) addStudent();
+  if (e.key === 'Escape') hideModal();
+});
+renderAll();
+</script>
+</body>
+</html>
