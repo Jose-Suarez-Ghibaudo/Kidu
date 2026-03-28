@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kidu Scanner">
+<meta name="theme-color" content="#0a0a0a">
+<title>Kidu Scanner</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+:root {
+  --blue: #3D2FCC; --blue-l: #EEF0FF;
+  --green: #00C48C; --green-l: #E6FAF4;
+  --coral: #FF6B6B; --coral-l: #FFF0F0;
+  --dark: #0a0a0a; --dark2: #1a1730;
+  --font: 'DM Sans', sans-serif; --mono: 'DM Mono', monospace;
+}
+html, body { height: 100%; overflow: hidden; background: var(--dark2); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+
+/* ══════════════════════════════
+   PANTALLA 1: SELECCIÓN DE ZONA
+══════════════════════════════ */
+#screen-zone {
+  position: fixed; inset: 0;
+  background: var(--dark2);
+  display: flex; flex-direction: column;
+  z-index: 50;
+  padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+}
+.zone-screen-header {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  flex-shrink: 0;
+}
+.zone-screen-logo { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+.logo-wm { font-size: 20px; font-weight: 700; color: white; letter-spacing: -0.5px; }
+.logo-wm span { color: var(--green); }
+.zone-screen-title { font-size: 22px; font-weight: 700; color: white; letter-spacing: -0.5px; }
+.zone-screen-sub { font-size: 13px; color: rgba(255,255,255,.45); margin-top: 4px; }
+
+.zone-list { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.zone-list::-webkit-scrollbar { display: none; }
+
+.zone-option {
+  background: rgba(255,255,255,.06);
+  border: 1.5px solid rgba(255,255,255,.1);
+  border-radius: 16px;
+  padding: 18px 20px;
+  display: flex; align-items: center; gap: 16px;
+  cursor: pointer;
+  transition: all .15s;
+  user-select: none;
+}
+.zone-option:active { background: rgba(61,47,204,.4); border-color: var(--blue); transform: scale(.98); }
+.zone-option-icon {
+  width: 48px; height: 48px; border-radius: 14px;
+  background: rgba(255,255,255,.08);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+.zone-option-body { flex: 1; }
+.zone-option-name { font-size: 17px; font-weight: 600; color: white; }
+.zone-option-beacon { font-size: 11px; font-family: var(--mono); color: rgba(255,255,255,.35); margin-top: 2px; }
+.zone-option-count { font-size: 12px; color: rgba(255,255,255,.4); margin-top: 3px; }
+.zone-option-arrow { font-size: 22px; color: rgba(255,255,255,.25); }
+
+.zone-loading { text-align: center; padding: 40px; color: rgba(255,255,255,.4); font-size: 14px; }
+
+/* ══════════════════════════════
+   PANTALLA 2: SCANNER
+══════════════════════════════ */
+#screen-scanner { position: fixed; inset: 0; display: none; }
+
+video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+canvas { display: none; }
+
+.scanner-overlay {
+  position: fixed; inset: 0; z-index: 10;
+  display: flex; flex-direction: column;
+  padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+}
+
+/* TOP */
+.scanner-top {
+  padding: 14px 16px 12px;
+  background: linear-gradient(to bottom, rgba(0,0,0,.8), transparent);
+  display: flex; align-items: center; gap: 12px;
+  flex-shrink: 0;
+}
+.back-zone-btn {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: rgba(255,255,255,.15); border: none;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; color: white; cursor: pointer; flex-shrink: 0;
+}
+.scanner-zone-pill {
+  flex: 1; background: var(--green);
+  border-radius: 20px; padding: 8px 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+.szp-dot { width: 8px; height: 8px; border-radius: 50%; background: white; animation: pulse-w 1.5s ease infinite; }
+@keyframes pulse-w { 0%,100%{opacity:1} 50%{opacity:.4} }
+.szp-name { font-size: 14px; font-weight: 700; color: white; }
+.scan-counter-pill { background: rgba(255,255,255,.15); border-radius: 20px; padding: 6px 14px; font-size: 12px; font-family: var(--mono); color: white; flex-shrink: 0; }
+
+/* VISOR */
+.scanner-center { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; }
+.viewfinder { width: 220px; height: 220px; position: relative; }
+.vf-corner { position: absolute; width: 36px; height: 36px; border-color: white; border-style: solid; }
+.vf-corner.tl { top:0; left:0;  border-width:3px 0 0 3px; border-radius:6px 0 0 0; }
+.vf-corner.tr { top:0; right:0; border-width:3px 3px 0 0; border-radius:0 6px 0 0; }
+.vf-corner.bl { bottom:0; left:0;  border-width:0 0 3px 3px; border-radius:0 0 0 6px; }
+.vf-corner.br { bottom:0; right:0; border-width:0 3px 3px 0; border-radius:0 0 6px 0; }
+.scan-line { position:absolute; left:6px; right:6px; height:2px; background:linear-gradient(to right,transparent,white,transparent); top:6px; animation:scan-mv 2s ease-in-out infinite; }
+@keyframes scan-mv { 0%,100%{top:6px} 50%{top:calc(100% - 8px)} }
+.vf-hint { font-size:13px; color:rgba(255,255,255,.65); text-align:center; }
+
+/* BOTTOM LOG */
+.scanner-bottom {
+  padding: 0 16px 12px;
+  background: linear-gradient(to top, rgba(0,0,0,.8), transparent);
+  flex-shrink: 0;
+}
+.scan-log { display:flex; flex-direction:column; gap:5px; max-height:90px; overflow:hidden; }
+.log-row { display:flex; align-items:center; gap:8px; font-size:12px; animation:slideUp .3s ease; }
+@keyframes slideUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+.log-dot-ok  { width:7px; height:7px; border-radius:50%; background:var(--green); flex-shrink:0; }
+.log-dot-err { width:7px; height:7px; border-radius:50%; background:var(--coral); flex-shrink:0; }
+.log-time { font-family:var(--mono); color:rgba(255,255,255,.3); font-size:11px; flex-shrink:0; }
+.log-msg  { color:rgba(255,255,255,.7); flex:1; }
+
+/* MANUAL FAB */
+.manual-fab {
+  position: fixed; bottom: calc(env(safe-area-inset-bottom,16px) + 110px); right: 18px;
+  width: 50px; height: 50px; border-radius: 50%;
+  background: rgba(255,255,255,.12); border:1.5px solid rgba(255,255,255,.2);
+  display:flex; align-items:center; justify-content:center;
+  font-size:20px; cursor:pointer; z-index:20;
+}
+
+/* FLASH RESULTADO */
+.result-flash {
+  position:fixed; inset:0; z-index:100;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  padding:32px; text-align:center;
+  opacity:0; pointer-events:none;
+  transition:opacity .15s;
+}
+.result-flash.show { opacity:1; pointer-events:all; }
+.result-flash.ok  { background:rgba(0,196,140,.93); }
+.result-flash.err { background:rgba(255,107,107,.93); }
+.rf-emoji { font-size:80px; margin-bottom:16px; }
+.rf-name  { font-size:30px; font-weight:700; color:white; letter-spacing:-1px; margin-bottom:6px; }
+.rf-zone  { font-size:17px; color:rgba(255,255,255,.85); margin-bottom:6px; }
+.rf-id    { font-size:12px; font-family:var(--mono); color:rgba(255,255,255,.5); }
+
+/* MODAL MANUAL */
+.modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.7); display:none; align-items:flex-end; justify-content:center; z-index:200; padding-bottom:env(safe-area-inset-bottom,0); }
+.modal-bg.show { display:flex; }
+.modal { background:#1a1a2e; border-radius:24px 24px 0 0; padding:28px 24px 32px; width:100%; border-top:1px solid rgba(255,255,255,.1); }
+.modal-handle { width:40px; height:4px; background:rgba(255,255,255,.2); border-radius:2px; margin:0 auto 20px; }
+.modal-title { font-size:18px; font-weight:700; color:white; margin-bottom:14px; }
+.modal-input { width:100%; background:rgba(255,255,255,.08); border:1.5px solid rgba(255,255,255,.15); border-radius:12px; padding:14px 16px; font-family:var(--mono); font-size:20px; color:white; outline:none; text-align:center; letter-spacing:3px; text-transform:uppercase; margin-bottom:12px; }
+.modal-input:focus { border-color:var(--green); }
+.modal-btn { width:100%; background:var(--green); color:white; border:none; border-radius:12px; padding:15px; font-family:var(--font); font-size:16px; font-weight:700; cursor:pointer; margin-bottom:10px; }
+.modal-cancel { width:100%; background:transparent; color:rgba(255,255,255,.4); border:none; font-family:var(--font); font-size:14px; cursor:pointer; padding:6px; }
+
+/* PERMISOS */
+.camera-start {
+  position:fixed; inset:0; background:var(--dark2);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:14px; z-index:300; padding:32px; text-align:center;
+}
+.camera-start-icon { font-size:60px; }
+.camera-start-title { font-size:22px; font-weight:700; color:white; }
+.camera-start-sub { font-size:14px; color:rgba(255,255,255,.5); line-height:1.6; }
+.camera-start-btn { background:var(--green); color:white; border:none; border-radius:14px; padding:16px 36px; font-family:var(--font); font-size:16px; font-weight:700; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<!-- ══ PANTALLA ZONA ══ -->
+<div id="screen-zone">
+  <div class="zone-screen-header">
+    <div class="zone-screen-logo">
+      <svg width="22" height="22" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="16" stroke="white" stroke-width="3" fill="none"/><circle cx="24" cy="24" r="7" fill="white"/><circle cx="24" cy="8" r="4" fill="#00C48C"/></svg>
+      <div class="logo-wm">Ki<span>d</span>u <span style="font-weight:400;color:rgba(255,255,255,.35);font-size:14px;">Scanner</span></div>
+    </div>
+    <div class="zone-screen-title">¿En qué zona estás?</div>
+    <div class="zone-screen-sub">Seleccioná el aula o espacio antes de escanear</div>
+  </div>
+  <div class="zone-list" id="zone-list">
+    <div class="zone-loading">Cargando zonas...</div>
+  </div>
+</div>
+
+<!-- ══ PANTALLA SCANNER ══ -->
+<div id="screen-scanner">
+  <video id="video" playsinline autoplay muted></video>
+  <canvas id="canvas"></canvas>
+
+  <div class="scanner-overlay">
+    <div class="scanner-top">
+      <button class="back-zone-btn" onclick="backToZones()">‹</button>
+      <div class="scanner-zone-pill">
+        <div class="szp-dot"></div>
+        <div class="szp-name" id="active-zone-name">—</div>
+      </div>
+      <div class="scan-counter-pill" id="scan-counter">0</div>
+    </div>
+
+    <div class="scanner-center">
+      <div class="viewfinder">
+        <div class="scan-line"></div>
+        <div class="vf-corner tl"></div>
+        <div class="vf-corner tr"></div>
+        <div class="vf-corner bl"></div>
+        <div class="vf-corner br"></div>
+      </div>
+      <div class="vf-hint">Acercá la tarjeta QR del alumno</div>
+    </div>
+
+    <div class="scanner-bottom">
+      <div class="scan-log" id="scan-log"></div>
+    </div>
+  </div>
+
+  <button class="manual-fab" onclick="showManual()">✏️</button>
+</div>
+
+<!-- FLASH -->
+<div class="result-flash" id="result-flash">
+  <div class="rf-emoji" id="rf-emoji">✅</div>
+  <div class="rf-name"  id="rf-name">—</div>
+  <div class="rf-zone"  id="rf-zone">—</div>
+  <div class="rf-id"    id="rf-id">—</div>
+</div>
+
+<!-- MODAL MANUAL -->
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Ingreso manual</div>
+    <input class="modal-input" id="manual-input" placeholder="KDU-042" maxlength="10" autocomplete="off" autocorrect="off" spellcheck="false">
+    <button class="modal-btn" onclick="processManual()">Registrar</button>
+    <button class="modal-cancel" onclick="hideManual()">Cancelar</button>
+  </div>
+</div>
+
+<!-- PERMISOS CÁMARA -->
+<div class="camera-start" id="camera-start" style="display:none;">
+  <div class="camera-start-icon">📷</div>
+  <div class="camera-start-title">Activar cámara</div>
+  <div class="camera-start-sub">Safari necesita permiso para usar la cámara y escanear los QR.</div>
+  <button class="camera-start-btn" onclick="startCamera()">Dar permiso</button>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://nqopxhhywdlpfwqqxarw.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xb3B4aGh5d2RscGZ3cXF4YXJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MDA2MDAsImV4cCI6MjA5MDI3NjYwMH0.UGOZkeN4yQ14ij7Daq99lpWiIaC7vI5B268Qsov53G4';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── ESTADO ──
+let ZONES = [];
+let currentZone = null;
+let scanning = false;
+let scanCount = 0;
+let lastCode = '';
+let lastTime = 0;
+let logEntries = [];
+let scanInterval = null;
+let cameraReady = false;
+
+// Íconos por nombre de zona
+function zoneIcon(name) {
+  const n = name.toLowerCase();
+  if (n.includes('entrada')) return '🚪';
+  if (n.includes('patio') || n.includes('recreo')) return '⛹️';
+  if (n.includes('biblio')) return '📚';
+  if (n.includes('gimnasio') || n.includes('gym')) return '🏃';
+  if (n.includes('comedor')) return '🍽️';
+  if (n.includes('lab')) return '🔬';
+  return '🏫';
+}
+
+// ── CARGAR ZONAS ──
+async function loadZones() {
+  try {
+    const { data } = await sb.from('zonas').select('*').order('nombre');
+    if (data && data.length > 0) {
+      ZONES = data.map(z => ({ id: z.id, name: z.nombre, beacon: z.beacon_id }));
+    } else {
+      ZONES = [
+        { name:'Entrada', beacon:'BCN-001' },
+        { name:'Aula 1',  beacon:'BCN-002' },
+        { name:'Aula 2',  beacon:'BCN-003' },
+        { name:'Patio',   beacon:'BCN-004' },
+      ];
+    }
+  } catch(e) {
+    ZONES = [{ name:'Entrada', beacon:'BCN-001' }];
+  }
+  renderZoneList();
+}
+
+function renderZoneList() {
+  const list = document.getElementById('zone-list');
+  list.innerHTML = '';
+
+  // Agrupar: primero Entrada, luego el resto ordenado
+  const entrada = ZONES.filter(z => z.name.toLowerCase().includes('entrada'));
+  const resto   = ZONES.filter(z => !z.name.toLowerCase().includes('entrada'));
+  const ordered = [...entrada, ...resto];
+
+  ordered.forEach(z => {
+    const btn = document.createElement('div');
+    btn.className = 'zone-option';
+    btn.innerHTML = `
+      <div class="zone-option-icon">${zoneIcon(z.name)}</div>
+      <div class="zone-option-body">
+        <div class="zone-option-name">${z.name}</div>
+        <div class="zone-option-beacon">${z.beacon}</div>
+      </div>
+      <div class="zone-option-arrow">›</div>
+    `;
+    btn.addEventListener('click', () => selectZone(z));
+    list.appendChild(btn);
+  });
+}
+
+// ── SELECCIONAR ZONA → IR A SCANNER ──
+async function selectZone(zone) {
+  currentZone = zone;
+  document.getElementById('active-zone-name').textContent = zone.name;
+  scanCount = 0;
+  document.getElementById('scan-counter').textContent = '0';
+  logEntries = [];
+  document.getElementById('scan-log').innerHTML = '';
+
+  // Mostrar pantalla scanner
+  document.getElementById('screen-zone').style.display = 'none';
+  document.getElementById('screen-scanner').style.display = 'block';
+
+  if (!cameraReady) {
+    document.getElementById('camera-start').style.display = 'flex';
+  } else {
+    startScanning();
+  }
+}
+
+function backToZones() {
+  stopScanning();
+  document.getElementById('screen-scanner').style.display = 'none';
+  document.getElementById('screen-zone').style.display = 'flex';
+}
+
+// ── CÁMARA ──
+async function startCamera() {
+  document.getElementById('camera-start').style.display = 'none';
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { exact: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+    });
+    document.getElementById('video').srcObject = stream;
+    await document.getElementById('video').play();
+    cameraReady = true;
+
+    // Iniciar audio
+    try { new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+    startScanning();
+  } catch(e) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      document.getElementById('video').srcObject = stream;
+      await document.getElementById('video').play();
+      cameraReady = true;
+      startScanning();
+    } catch(e2) {
+      // Sin cámara — modo manual
+      addLog('Sin cámara — usá ingreso manual', false);
+    }
+  }
+}
+
+function startScanning() {
+  scanning = true;
+  if (scanInterval) clearInterval(scanInterval);
+  scanInterval = setInterval(tryDecodeFrame, 80);
+}
+
+function stopScanning() {
+  scanning = false;
+  if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+}
+
+// ── DECODE ──
+function tryDecodeFrame() {
+  if (!scanning) return;
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  if (!video.videoWidth) return;
+
+  const size = Math.min(video.videoWidth, video.videoHeight) * 0.5;
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(video, (video.videoWidth-size)/2, (video.videoHeight-size)/2, size, size, 0, 0, size, size);
+
+  try {
+    const lum = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+    const result = new ZXing.QRCodeReader().decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum)));
+    if (result?.text) {
+      const now = Date.now();
+      if (result.text === lastCode && now - lastTime < 1500) return;
+      lastCode = result.text;
+      lastTime = now;
+      handleScan(result.text);
+    }
+  } catch(e) {}
+}
+
+// ── PROCESAR ──
+async function handleScan(raw) {
+  scanning = false;
+  let id = raw.trim().toUpperCase();
+  try { const j = JSON.parse(raw); id = j.id || j.pulsera_id || id; } catch {}
+  try { await register(id); } catch(e) { scanning = true; startScanning(); }
+}
+
+async function processManual() {
+  const val = document.getElementById('manual-input').value.trim().toUpperCase();
+  if (!val) return;
+  hideManual();
+  await register(val);
+}
+
+async function register(pulsera_id) {
+  const { data, error } = await sb.rpc('mover_alumno', {
+    p_pulsera_id: pulsera_id,
+    p_beacon_id: currentZone.beacon,
+    p_rssi: -55
+  });
+
+  const flash = document.getElementById('result-flash');
+  const moved    = !error && data?.ok === true;
+  const sameZone = !error && data?.ok === false && data?.msg?.includes('Sin cambio');
+
+  if (moved || sameZone) {
+    document.getElementById('rf-emoji').textContent = '✅';
+    document.getElementById('rf-name').textContent  = data.alumno || pulsera_id;
+    document.getElementById('rf-zone').textContent  = moved ? `→ ${data.zona}` : `✓ Ya en ${currentZone.name}`;
+    document.getElementById('rf-id').textContent    = pulsera_id;
+    flash.className = 'result-flash ok show';
+    beepOk(); vibrate(true);
+    scanCount++;
+    document.getElementById('scan-counter').textContent = scanCount;
+    addLog(`${data.alumno || pulsera_id} → ${currentZone.name}`, true);
+  } else {
+    document.getElementById('rf-emoji').textContent = '❌';
+    document.getElementById('rf-name').textContent  = 'No registrado';
+    document.getElementById('rf-zone').textContent  = pulsera_id;
+    document.getElementById('rf-id').textContent    = error?.message || 'ID no encontrado';
+    flash.className = 'result-flash err show';
+    beepErr(); vibrate(false);
+    addLog(`Sin registro: ${pulsera_id}`, false);
+  }
+
+  setTimeout(() => {
+    flash.className = 'result-flash';
+    lastCode = ''; lastTime = 0;
+    scanning = true;
+    startScanning();
+  }, 900);
+}
+
+// ── LOG ──
+function addLog(msg, ok) {
+  const time = new Date().toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  logEntries.unshift({ msg, ok, time });
+  if (logEntries.length > 4) logEntries.pop();
+  document.getElementById('scan-log').innerHTML = logEntries.map(e => `
+    <div class="log-row">
+      <div class="${e.ok ? 'log-dot-ok' : 'log-dot-err'}"></div>
+      <div class="log-time">${e.time}</div>
+      <div class="log-msg">${e.msg}</div>
+    </div>
+  `).join('');
+}
+
+// ── AUDIO ──
+let audioCtx = null;
+function getAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return audioCtx; }
+function beep(freq, dur, type='sine') {
+  try {
+    const ctx = getAudio();
+    const osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = freq; osc.type = type;
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.start(); osc.stop(ctx.currentTime + dur);
+  } catch(e) {}
+}
+function beepOk()  { beep(880,.1); setTimeout(()=>beep(1320,.15),90); }
+function beepErr() { beep(220,.3,'sawtooth'); }
+function vibrate(ok) { if ('vibrate' in navigator) navigator.vibrate(ok ? [40,20,40] : [200]); }
+
+// ── MODAL ──
+function showManual() { document.getElementById('modal').classList.add('show'); setTimeout(()=>document.getElementById('manual-input').focus(),100); }
+function hideManual() { document.getElementById('modal').classList.remove('show'); document.getElementById('manual-input').value=''; }
+document.getElementById('manual-input').addEventListener('keydown', e => { if(e.key==='Enter') processManual(); });
+
+// ── INIT ──
+loadZones();
+</script>
+</body>
+</html>
